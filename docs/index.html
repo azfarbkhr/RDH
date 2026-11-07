@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Documentation | Redirect Hub</title>
+  <link rel="stylesheet" href="assets/site.css">
+  <script src="assets/menu.js" defer></script>
+</head>
+<body>
+<main>
+<h1>Redirect Hub documentation</h1>
+<p>The agent team, project skills, and documentation scaffold were imported on 8 November 2026. Owner comments and the Dub feature analysis are recorded, and feature proposals are listed in the ticket queue.</p>
+<ol>
+  <li><a href="product/index.html">Product</a> — purpose, target users, requirements, scope, and owner decisions.</li>
+  <li><a href="architecture/index.html">Architecture</a> — system design, data flows, and architecture decisions.</li>
+  <li><a href="research/index.html">Research</a> — dated sources, experiments, and evidence limits.</li>
+  <li><a href="technical/index.html">Technical</a> — verified setup, implementation, testing, and operations.</li>
+  <li><a href="user-guides/index.html">User guides</a> — verified workflows, examples, and troubleshooting.</li>
+  <li><a href="reports/index.html">Program reports</a> — current outcomes and next actions.</li>
+  <li><a href="reviews/index.html">Independent reviews</a> — candidate-specific verdicts and evidence.</li>
+  <li><a href="tickets/index.html">Ticket queue</a> — JSONL queue data and HTML ticket details.</li>
+</ol>
+<p>Read the <a href="reports/2026-11-08-project-setup.html">setup record</a> for copy boundaries and verification. Agent instructions are in the <a href="../AGENTS.md">root guide</a>, <a href="../agent-team/README.md">team overview</a>, and <a href="AGENTS.md">documentation guide</a>.</p>
+<h2>Local preview</h2>
+<p>Run this command from the repository root:</p>
+<pre><code>python -m http.server 8765 --bind 127.0.0.1</code></pre>
+<p>Open <a href="http://127.0.0.1:8765/docs/">http://127.0.0.1:8765/docs/</a>. The ticket queue requires HTTP so the browser can fetch its JSONL source.</p>
+</main>
+</body>
+</html>

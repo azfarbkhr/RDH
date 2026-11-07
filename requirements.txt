@@ -1,0 +1,12 @@
+Django
+pyodbc
+mssql-django
+whitenoise
+python-dotenv
+django-crispy-forms
+django-user-agents
+django-ipware
+django-cors-headers
+sqlserverport
+psycopg2
+

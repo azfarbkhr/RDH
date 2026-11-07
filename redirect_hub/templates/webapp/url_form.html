@@ -1,0 +1,76 @@
+{% extends "webapp/layout.html" %}
+{% load static %}
+
+{% block title %} Add/Edit Redirect URL{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-2  mt-4 ">
+    <div class="card-header d-sm-flex align-items-center justify-content-between py-3 ">
+        <h6 class="m-0 font-weight-bold text-primary">Redirect URL - Add/Edit</h6>
+    </div>
+    
+    <div class="card-body">
+        <div class="row">
+            <div class="col-lg-6">
+                <form method="post" >
+                    {% csrf_token %}
+                    {{ form.non_field_errors }}
+                    
+                    <div class="form-group">
+                        <label for="{{ form.target_url.id_for_label }}" class="form-label">Link To</label>
+                        <input type="url" name="target_url" required class="form-control {% if form.target_url.errors %}is-invalid{% endif %}" id="{{ form.target_url.id_for_label }}" aria-describedby="target_url_help" placeholder="https://wwww.facebook.com/post/1234567890" value="{{ form.target_url.value | default_if_none:''  }}">
+                        <div class="invalid-feedback">
+                            {% for error in form.target_url.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                        <small id="target_url_help" class="form-text text-muted">Users will be redirected to this URL.</small>
+                    </div>
+                                       
+                    
+                    <div class="form-group">
+                        <label for="{{ form.short_code.id_for_label }}" class="form-label">Link From</label>
+                        <div class="input-group mb-3">
+                            <div class="input-group-prepend">
+                              <span class="input-group-text" id="basic-addon3">{{ request.scheme }}://{{ request.get_host }}/l/</span>
+                            </div>
+                            <input type="text" name="short_code" required  class="form-control {% if form.short_code.errors %}is-invalid{% endif %}" id="{{ form.short_code.id_for_label }}" aria-describedby="short_code_help" placeholder="short" value="{{ form.short_code.value | default_if_none:'' }}">
+                            <div class="invalid-feedback">
+                                {% for error in form.short_code.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>                      
+                        </div>
+                        <i class="bi bi-clipboard"></i>
+                        <small id="short_code_help" class="form-text text-muted">Your shareable URL – update anytime. Keep your audience connected to your latest content, whether it's promotions, coupons, or more.</small>
+                    </div>                    
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<script>
+    // JavaScript function to format URL
+    function formatToValidUrl(input) {
+        let trimmedInput = input.trim();
+        if (trimmedInput) {
+            if (!trimmedInput.startsWith('http://') && !trimmedInput.startsWith('https://')) {
+                trimmedInput = 'http://' + trimmedInput;
+            }
+            return trimmedInput;
+        }
+        return '';
+    }
+
+    // Event listener for focus-out event
+    document.querySelector('[name="target_url"]').addEventListener('blur', function() {
+        this.value = formatToValidUrl(this.value);
+    });
+</script>
+
+
+{% endblock %}

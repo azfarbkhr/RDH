@@ -1,0 +1,111 @@
+{% extends "webapp/layout.html" %}
+{% load static %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-xl-12 col-lg-12 col-md-12">
+            <div class="card o-hidden border-0 shadow-lg my-5">
+                <div class="card-body p-0">
+                    <div class="row">
+                        <div class="col-lg-5 d-none d-lg-block">
+                            <img src="{% static 'webapp/images/link-redirect-signup-page.png' %}" alt="Sign up to the link redirect" class="img-fluid px-3 px-sm-4 mt-3 mb-4"  style="width: 100rem;"> 
+                        </div>                             
+                        <div class="col-lg-7">                                                   
+                            <div class="p-3">                                
+                                <div class="text-center">
+                                    <h1 class="h4 text-gray-900 mb-4"><a href="{% url 'homepage_url' %}">Link Redirect App</a></h1>
+                                    <h2 class="h4 text-gray-900 mb-4">Create an Account!</h2>
+                                </div>
+                                <form class="user" href="{% url 'register' %}" method="post">
+                                    {% if register_form.non_field_errors %}
+                                    <ul class='form-errors'>
+                                        {% for error in form.non_field_errors %}
+                                        <p style="color: red;">{{ error }}</p>
+                                        {% endfor %}
+                                    </ul>
+                                    {% endif %}
+                                    {% csrf_token %}
+                                    <div class="form-group row">
+                                        <div class="col-sm-12 mb-12 mb-sm-12">
+                                            {{ register_form.username }}
+                                        </div>
+                                    </div>
+                                    {% if register_form.username.error %}
+                                    <div class="form-group row">
+                                        <div class="col-sm-12 mb-12 mb-sm-12">
+                                            {{ register_form.username.error }}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+
+                                    <div class="form-group">
+                                        {{ register_form.email }}
+                                    </div>
+
+                                    {% if register_form.email.error %}
+                                    <div class="form-group">
+                                        {{ register_form.email.error }}
+                                    </div>
+                                    {% endif %}
+
+                                    <div class="form-group row">
+                                        <div class="col-sm-6 mb-3 mb-sm-0">
+                                            {{ register_form.password1 }}
+                                        </div>
+                                        <div class="col-sm-6">
+                                            {{ register_form.password2 }}
+                                        </div>
+                                    </div>
+                                    {% if register_form.password1.helptext %}
+                                    <div class="form-group row">
+                                        <div class="col-sm-6 mb-3 mb-sm-0">
+                                            {{ register_form.password1.helptext }}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if register_form.errors %}
+                                    <div class="form-group row">
+                                        <div class="col-sm-12 mb-0 mb-sm-0">
+                                            <ul class="text-danger">
+                                                {{ register_form.errors.as_text }}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    <button type="submit" class="btn btn-primary btn-user btn-block">Register
+                                        Account</button>
+                                </form>
+                                <hr>
+
+                                <div class="text-center">
+                                    <a class="small" href="{% url 'login' %}">Already have an account? Login!</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script>
+    $('#id_username').addClass('form-control form-control-user');
+    $('#id_username').attr('placeholder', 'Username');
+    $('#id_email').addClass('form-control form-control-user');
+    $('#id_email').attr('placeholder', 'Email Address');
+    $('#id_password1').addClass('form-control form-control-user');
+    $('#id_password1').attr('placeholder', 'Password');
+    $('#id_password2').addClass('form-control form-control-user');
+    $('#id_password2').attr('placeholder', 'Confirm Password');
+</script>
+
+{% endblock %}

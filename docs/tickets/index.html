@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ticket Queue</title>
+  <link rel="stylesheet" href="../assets/site.css">
+  <script src="../assets/menu.js" defer></script>
+  <script src="tickets.js" defer></script>
+</head>
+<body>
+<main>
+  <h1>Ticket Queue</h1>
+  <p>The queue is loaded from <code>tickets.jsonl</code>. Detailed scope and evidence live in each ticket file.</p>
+  <button id="refresh-tickets" type="button">Refresh queue</button>
+  <p id="ticket-queue-status" role="status" aria-live="polite">Loading tickets…</p>
+  <table>
+    <caption>Current ticket priority and lifecycle status</caption>
+    <thead>
+      <tr><th scope="col">ID</th><th scope="col">Priority</th><th scope="col">Ticket</th><th scope="col">Status</th><th scope="col">Depends on</th></tr>
+    </thead>
+    <tbody id="ticket-rows"></tbody>
+  </table>
+</main>
+</body>
+</html>

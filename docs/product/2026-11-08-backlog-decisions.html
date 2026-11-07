@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Backlog direction and owner decisions | Redirect Hub</title><link rel="stylesheet" href="../assets/site.css"><script src="../assets/menu.js" defer></script></head><body><main>
+<h1>Backlog direction and owner decisions</h1>
+<p><strong>Recorded 8 November 2026.</strong> The owner authorized feature analysis and ticket creation, including an MCP server. This creates proposals for delivery, not an instruction to implement every competitor feature.</p>
+<ol>
+<li><strong>D-001: competitor analysis.</strong> Review Dub for useful additions and distinguish small configuration features from larger infrastructure work.</li>
+<li><strong>D-002: application appearance.</strong> Redesign the application UI and UX. Accepted direction: quiet neutral surfaces, readable typography, generous spacing, subtle borders, one accent, and human-friendly link names.</li>
+<li><strong>D-003: public presentation.</strong> The GitHub README is the public showcase. No marketing landing page. Existing stock-template homepage should become a direct application entry.</li>
+<li><strong>D-004: agent integration.</strong> Add MCP tickets. Proposed implementation sequence is an authenticated management API, local stdio tools, then a self-hostable Streamable HTTP endpoint for remote clients. Transport sequence is a planning recommendation, not an owner-specified restriction.</li>
+</ol>
+<h2>UI acceptance rubric</h2><p>Judge the redesign by a consistent component system, clear primary actions, readable link names, visible copy feedback, informative empty/error states, responsive 390px/1440px layouts, keyboard operation, and accessible contrast. Use real app screenshots and clearly labeled synthetic metrics in the README. No invented analytics in unfinished screens.</p>
+<h2>Open implementation decisions</h2><p>Select exact dependency/protocol versions, default self-host database, country database and its permitted distribution, retention defaults, and remote-client authorization design during grooming. Delivery estimates are relative only. Custom domains and webhooks need an explicit later owner selection because they add ongoing operational complexity. The agent-team role guides remain unchanged.</p>
+<p>See the <a href="../research/2026-11-08-dub-feature-analysis.html">feature analysis</a> and <a href="../tickets/index.html">canonical ticket queue</a>. Each ticket requires independent readiness review before delivery.</p>
+</main></body></html>

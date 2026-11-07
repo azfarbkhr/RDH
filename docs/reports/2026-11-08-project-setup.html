@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent team and documentation setup | Redirect Hub</title>
+  <link rel="stylesheet" href="../assets/site.css">
+  <script src="../assets/menu.js" defer></script>
+</head>
+<body>
+<main>
+<h1>Agent team and documentation setup</h1>
+<p><strong>Installed on 8 November 2026.</strong> The user requested an unchanged copy of the source agent team and all its skills, with the documentation structure reused for Redirect Hub.</p>
+<h2>Copy boundaries</h2>
+<p>Source: <code>D:\WorkReceiptBot\RB-Data-Extraction-Engine</code>. Destination: <code>D:\WorkITAAI\RDH</code>.</p>
+<ol>
+  <li>The root <code>AGENTS.md</code>, complete <code>agent-team/</code> directory with 15 roles, and complete <code>.agents/</code> directory with 4 skills and their references are copied unchanged.</li>
+  <li>The documentation guide, shared CSS, ticket renderer, queue page, ticket template, and ticket folder guide are copied unchanged.</li>
+  <li>Documentation categories and <code>reports/evidence/</code> are recreated. Landing pages and folder guides describe Redirect Hub. The navigation brand is changed to Redirect Hub.</li>
+  <li>The queue starts empty. Source-project reports, research, reviews, evidence, and individual ticket directories are excluded.</li>
+</ol>
+<h2>Existing checkout and instructions</h2>
+<p>The existing checkout is on <code>master</code>. It is retained for this user-requested setup. The copied guides refer to <code>main</code> and contain receipt/OCR-specific examples. Those references are preserved because the user requested the team as-is. No branch switch or instruction rewrite was performed.</p>
+<p>Pre-existing changes to <code>.vscode/settings.json</code>, <code>readme.MD</code>, <code>redirect_hub/redirect_hub/settings.py</code>, and the untracked root <code>requirements.txt</code> are outside this setup and are preserved.</p>
+<h2>Verification</h2>
+<p id="verification">Import checks passed in the existing Windows checkout on 8 November 2026. These are setup checks performed by the importing agent, not an independent review.</p>
+<ol>
+  <li><strong>Copy fidelity:</strong> PowerShell <code>Get-FileHash -Algorithm SHA256</code> compared 31 copied files with the source. All matched, including the root guide, all 15 roles, all 4 skills and their references, and the 6 unchanged documentation infrastructure files.</li>
+  <li><strong>Documentation:</strong> Python's standard-library HTML parser checked all 11 HTML pages and 36 local file links. Every local target exists, and every page includes the shared CSS and navigation script.</li>
+  <li><strong>Queue:</strong> the JSONL file is zero bytes. No historical <code>T-*/ticket.html</code> files were imported. The queue page and renderer match the source.</li>
+  <li><strong>Existing work:</strong> <code>git -c safe.directory=D:/WorkITAAI/RDH status --short --branch</code> showed the same pre-existing modified files and untracked requirements file before and after setup. The only new setup paths are <code>AGENTS.md</code>, <code>agent-team/</code>, <code>.agents/</code>, and <code>docs/</code>. No global Git setting was changed.</li>
+  <li><strong>Existing whitespace:</strong> <code>git -c safe.directory=D:/WorkITAAI/RDH diff --check</code> reported trailing whitespace in the user's pre-existing change at <code>readme.MD:13</code>. That file was left untouched. This command does not check the new untracked setup files.</li>
+</ol>
+<h2>Limits and next action</h2>
+<p>No application features, schedules, external chats, commits, or public releases are created by this import. The application was not started or tested. Browser rendering and the runtime ticket fetch were not exercised. No independent review verdict is claimed.</p>
+<p>The owner reviews the proposed product direction. The coordinator can then record approved decisions and create Redirect Hub tickets.</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,295 @@
+{% load static %}
+
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <meta name="description" content="">
+        <meta name="author" content="">
+
+        <title>Link Redirect! Welcome</title>
+
+        <!-- CSS FILES -->        
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Open+Sans&display=swap" rel="stylesheet">
+                        
+        <link href="{% static 'website/css/bootstrap.min.css' %}" rel="stylesheet">
+
+        <link href="{% static 'website/css/bootstrap-icons.css' %}" rel="stylesheet">
+
+        <link href="{% static 'website/css/templatemo-topic-listing.css' %}" rel="stylesheet">      
+
+    </head>
+    
+    <body id="top">
+        <main>
+            <nav class="navbar navbar-expand-lg">
+                <div class="container">
+                    <a class="navbar-brand text-white" href="{% url 'homepage_url' %}">
+                        <span>Link Redirect</span>
+                    </a>
+    
+                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+    
+                    <div class="collapse navbar-collapse" id="navbarNav">
+                        <ul class="navbar-nav ms-lg-5 me-lg-auto">
+    
+                            <li class="nav-item">
+                                <a class="nav-link click-scroll" href="#section_3">How it works</a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a class="nav-link click-scroll" href="#section_4">FAQs</a>
+                            </li>
+    
+                            <li class="nav-item">
+                                <a class="nav-link click-scroll" href="#section_5">Contact</a>
+                            </li>
+
+                            {% if user.is_authenticated %}
+                            <li class="nav-item">
+                                <a class="nav-link click-scroll" href="{% url 'index' %}">Login</a>
+                            </div>                            
+                            {% else %}
+                            <li class="nav-item">
+                                <a class="nav-link click-scroll" href="{% url 'register' %}">Register/Sign Up</a>
+                            </li>                            
+                            {% endif %}                            
+
+                        </ul>
+
+                        
+                        {% if user.is_authenticated %}
+
+                        {% endif %}
+                        
+                    </div>
+                </div>
+            </nav>
+            
+
+            <section class="hero-section d-flex justify-content-center align-items-center" id="section_1">
+                <div class="container">
+                    <div class="row">
+                        <div class="col-lg-8 col-12 mx-auto">
+                            <h1 class="text-white text-center">Redirection made easy!</h1>
+                            <h6 class="text-white text-center">focus on your goal rather than how to setup a link redirect.</h6>
+                        </div>
+
+                    </div>
+                </div>
+            </section>
+
+            <section class="timeline-section section-padding" id="section_3">
+                <div class="section-overlay"></div>
+
+                <div class="container">
+                    <div class="row">
+
+                        <div class="col-12 text-center">
+                            <h2 class="mb-4">How does it work?</h1>
+                        </div>
+
+                        <div class="col-lg-10 col-12 mx-auto">
+                            <div class="timeline-container">
+                                <ul class="vertical-scrollable-timeline" id="vertical-scrollable-timeline">
+                                    <div class="list-progress">
+                                        <div class="inner"></div>
+                                    </div>
+
+                                    <li>
+                                        <h4 class="mb-3">Register an account with Redirect Link.</h4>
+                                        <div class="icon-holder">
+                                          <i class="bi-search"></i>
+                                        </div>
+                                    </li>
+                                    
+                                    <li>
+                                        <h4 class="mb-3">Provide a short URL and target URL for redirect configuration.</h4>
+                                        <div class="icon-holder">
+                                          <i class="bi-bookmark"></i>
+                                        </div>
+                                    </li>
+
+                                    <li>
+                                        <h4 class="mb-3">Share your short link and update the target link at any time.</h4>
+                                        <div class="icon-holder">
+                                          <i class="bi-book"></i>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+            <section class="faq-section section-padding" id="section_4">
+                <div class="container">
+                    <div class="row">
+
+                        <div class="col-lg-6 col-12">
+                            <h2 class="mb-4">Frequently Asked Questions</h2>
+                        </div>
+
+                        <div class="clearfix"></div>
+
+                        <div class="col-lg-5 col-12">
+                            <img src="{% static 'website/images/faq_graphic.jpg' %}" class="img-fluid" alt="FAQs">
+                        </div>
+
+                        <div class="col-lg-6 col-12 m-auto">
+                            <div class="accordion" id="accordionExample">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="faq-heading-1">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-collapse-1" aria-expanded="true" aria-controls="faq-collapse-1">
+                                            What is Link Redirect?
+                                        </button>
+                                    </h2>
+                                
+                                    <div id="faq-collapse-1" class="accordion-collapse collapse" aria-labelledby="faq-heading-1" data-bs-parent="#faq-accordion">
+                                        <div class="accordion-body">
+                                            Link Redirect is a web application that allows you to create and manage custom redirect links, making it easy to share and track the performance of your URLs.
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="faq-heading-2">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-collapse-2" aria-expanded="true" aria-controls="faq-collapse-2">
+                                            How do I create a redirect link?
+                                        </button>
+                                    </h2>
+                                
+                                    <div id="faq-collapse-2" class="accordion-collapse collapse" aria-labelledby="faq-heading-2" data-bs-parent="#faq-accordion">
+                                        <div class="accordion-body">
+                                            After logging in, click on the "Add Redirect Link" option in your dashboard. Enter the source URL you want to redirect from and the destination URL.
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="faq-heading-3">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-collapse-3" aria-expanded="true" aria-controls="faq-collapse-3">
+                                            Can I customize the short URL?
+                                        </button>
+                                    </h2>
+                                
+                                    <div id="faq-collapse-3" class="accordion-collapse collapse" aria-labelledby="faq-heading-3" data-bs-parent="#faq-accordion">
+                                        <div class="accordion-body">
+                                            Yes, you can customize the short URL to make it more meaningful or branded. We plan to launch more customizations like supporting custom domains. 
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="faq-heading-4">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-collapse-4" aria-expanded="true" aria-controls="faq-collapse-4">
+                                            How do I edit or update an existing redirect?
+                                        </button>
+                                    </h2>
+                                
+                                    <div id="faq-collapse-4" class="accordion-collapse collapse" aria-labelledby="faq-heading-4" data-bs-parent="#faq-accordion">
+                                        <div class="accordion-body">
+                                            In your dashboard, locate the redirect you wish to edit, and click on the "pencil" icon. You can modify the destination URL or other details.
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="faq-heading-6">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-collapse-6" aria-expanded="true" aria-controls="faq-collapse-6">
+                                            Does Link Redirect provide link analytics?
+                                        </button>
+                                    </h2>
+                                
+                                    <div id="faq-collapse-6" class="accordion-collapse collapse" aria-labelledby="faq-heading-6" data-bs-parent="#faq-accordion">
+                                        <div class="accordion-body">
+                                            We are working on incorporating link analytics into our platform. If you have any unique ideas, please connect with us and we will be happy to assess its feasibility. 
+                                        </div>
+                                    </div>
+                                </div>                            
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="faq-heading-8">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-collapse-8" aria-expanded="true" aria-controls="faq-collapse-8">
+                                            Are my redirect links secure and private?
+                                        </button>
+                                    </h2>
+                                
+                                    <div id="faq-collapse-8" class="accordion-collapse collapse" aria-labelledby="faq-heading-8" data-bs-parent="#faq-accordion">
+                                        <div class="accordion-body">
+                                            Link Redirect takes data security seriously. Your redirect links are private by default, and access to them is only granted the account holder.
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="faq-heading-9">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-collapse-9" aria-expanded="true" aria-controls="faq-collapse-9">
+                                            Is there a way to password-protect my redirect links?
+                                        </button>
+                                    </h2>
+                                
+                                    <div id="faq-collapse-9" class="accordion-collapse collapse" aria-labelledby="faq-heading-9" data-bs-parent="#faq-accordion">
+                                        <div class="accordion-body">
+                                            Nope, we plan to implement the password protection feature that will allow you to share your content with relevant parties and track if they read your content or not. 
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="faq-heading-10">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-collapse-10" aria-expanded="false" aria-controls="faq-collapse-10">
+                                            How can I get help or support if I encounter issues?
+                                        </button>
+                                    </h2>
+                                
+                                    <div id="faq-collapse-10" class="accordion-collapse collapse" aria-labelledby="faq-heading-10" data-bs-parent="#faq-accordion">
+                                        <div class="accordion-body">
+                                            If you have any questions or encounter issues, you can reach out to our support team through the email mentioned below. We will be happy to assist. 
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </section>
+
+
+            <section class="contact-section section-padding section-bg" id="section_5">
+                <div class="container">
+                    <div class="row">
+
+                        <div class="col-lg-12 col-12 text-center">
+                            <h2 class="mb-5">Get in touch</h2>
+                            <p>For any queries, please drop an email at <a href="mailto:hello@link-redirect.com">hello@link-redirect.com</a></p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+
+
+        <!-- JAVASCRIPT FILES -->
+        <script src="{% static 'website/js/jquery.min.js' %}"></script>
+        <script src="{% static 'website/js/bootstrap.bundle.min.js' %}"></script>
+        <script src="{% static 'website/js/jquery.sticky.js' %}"></script>
+        <script src="{% static 'website/js/click-scroll.js' %}"></script>
+        <script src="{% static 'website/js/custom.js' %}"></script>
+
+    </body>
+</html>
