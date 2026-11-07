@@ -1,15 +1,18 @@
-# Getting Started
+# Redirect Hub
 
-Run the following commands in your system
-```
-git clone https://econsultingfirm.visualstudio.com/RDH/_git/RDH
-cd RDH
-py -m venv .venv
-source .venv/Scripts/activate
-py -m pip install --upgrade pip
-pip install -r requirements.txt
+## Goal
 
-```
-setup a .env file 
+To build a self-hosted link redirection service with following features; 
+- keeps shared URLs stable while destinations change
+- adds different target based on filters like country or time
+- analyse traffic
+- an MCP server soagents can manage link redirection
 
-un: azfar
+See [current project status](docs/reports/index.html) for planning evidence and open work.
+
+## Project map
+
+1. [redirect_hub/](redirect_hub/) — Django project, authentication, link management, templates, and static assets.
+2. [docs/](docs/index.html) — product, architecture, research, technical/user documentation, reviews, and tickets.
+3. [agent-team/](agent-team/README.md) — role-based agent workflow and prompts.
+
