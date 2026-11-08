@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Local MCP server | Redirect Hub</title>
+<link rel="stylesheet" href="../assets/site.css">
+<script src="../assets/menu.js" defer></script>
+</head>
+<body><main>
+<h1>Connect a local MCP client</h1>
+<p>Redirect Hub includes a local stdio server built with the official TypeScript MCP SDK. It calls the Hono API using a bearer token and does not open a network port. Use it only with an MCP host you trust, and give the token the narrowest scope that meets your needs.</p>
+<h2>Prepare the app</h2>
+<p>Install workspace dependencies, start the API with <code>pnpm dev</code>, and create the owner account in the React app at <code>http://127.0.0.1:5173</code>. In the app, open <strong>API access</strong>, create a token, and copy its value immediately; it is only shown once. Choose <strong>Read only</strong> for inspection and preview, or <strong>Read and write</strong> to also allow link and rule changes.</p>
+<h2>Add the server to an MCP host</h2>
+<p>Client configuration names vary. The example below uses a Node process directly so package-manager output cannot interfere with the stdio protocol. Replace the paths with the absolute paths on your machine:</p>
+<pre><code>{
+  "mcpServers": {
+    "redirect-hub": {
+      "command": "node",
+      "args": ["--import", "tsx", "src/mcp.ts"],
+      "cwd": "D:\\WorkITAAI\\RDH\\apps\\api",
+      "env": {
+        "REDIRECT_HUB_API_URL": "http://127.0.0.1:8787",
+        "REDIRECT_HUB_API_TOKEN": "paste-the-token-you-created-in-the-app"
+      }
+    }
+  }
+}</code></pre>
+<p>For a different checkout, change the working directory. Keep the token in your local MCP host configuration or secret store; do not commit it to the repository. The process writes MCP protocol messages to stdout and diagnostics to stderr.</p>
+<h2>Available tools</h2>
+<ul>
+<li><code>list_links</code>, <code>get_link</code>, and <code>list_routing_rules</code> inspect the single owner's links and ordered routing rules.</li>
+<li><code>simulate_redirect</code> previews saved rules without redirecting or recording an analytics event.</li>
+<li><code>get_analytics</code> returns bot-filtered totals and available device, country, rule, and top-link aggregates.</li>
+<li><code>create_link</code>, <code>update_link</code>, <code>create_routing_rule</code>, and <code>delete_routing_rule</code> are only registered when <code>REDIRECT_HUB_MCP_ALLOW_WRITES=1</code> is set for the process.</li>
+</ul>
+<p>To register write tools, add <code>REDIRECT_HUB_MCP_ALLOW_WRITES=1</code> to this MCP host's <code>env</code> object and restart the MCP process. The API still checks that the token has read/write scope; the environment switch alone does not grant API access. Read-only is the default. The API URL can point to loopback over HTTP or to a remote HTTPS endpoint; plain HTTP to a non-loopback host is rejected. Remote MCP transport is not provided.</p>
+<h2>Implementation status</h2>
+<p>This is an early local integration. The workspace build confirms TypeScript compilation, but a client/Inspector round trip has not yet been recorded. Tool behavior, database migration, and client-specific setup still need runtime review. See <a href="../tickets/T-0012-local-mcp-server/ticket.html">ticket T-0012</a> for acceptance criteria and open checks.</p>
+<p>The server uses <a href="https://github.com/modelcontextprotocol/typescript-sdk">the official MCP TypeScript SDK</a>. The SDK's <a href="https://ts.sdk.modelcontextprotocol.io/v2/serving/stdio">stdio guide</a> documents the local process transport and stdout/stderr requirement.</p>
+</main></body></html>

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Build a link with UTM tracking | Redirect Hub</title>
+  <link rel="stylesheet" href="../assets/site.css">
+  <script src="../assets/menu.js" defer></script>
+</head>
+<body>
+<main>
+  <h1>Build a link with UTM tracking</h1>
+  <p>Use optional campaign fields to add consistent analytics parameters to a short link's destination.</p>
+
+  <h2>Create a tracked link</h2>
+  <ol>
+    <li>Open <strong>Links</strong> and choose <strong>Create link</strong>.</li>
+    <li>Enter a name and an HTTP(S) destination.</li>
+    <li>Under <strong>Campaign tracking</strong>, fill in any of the five fields: Source, Medium, Campaign, Term, and Content.</li>
+    <li>Review <strong>Final destination preview</strong> as you edit. It shows the destination URL after the configured tracking values are applied.</li>
+    <li>Create the short link. To change or clear tracking values later, open that link's <strong>Settings</strong>, edit the fields, and save.</li>
+  </ol>
+
+  <h2>How destination parameters work</h2>
+  <p>The saved values apply after the service chooses the link's default or matching rule destination. For each standard UTM key, existing occurrences are removed case-insensitively; each non-empty configured value is then added once using its lowercase key. A blank field therefore removes that UTM key from the destination.</p>
+  <p>Other query parameters are kept, including repeated keys and their order. The destination fragment is preserved. The visitor's query string on the short URL is ignored and is not forwarded.</p>
+
+  <h2>Field limits</h2>
+  <p>Each value is trimmed at its ends and accepts up to 200 Unicode code points. Interior spaces and Unicode characters are allowed and URL-encoded in the preview and redirect. Values longer than the limit or non-string API values are rejected with field-specific validation errors.</p>
+
+  <h2>Example</h2>
+  <p>With this destination:</p>
+  <pre><code>https://example.com/landing?ref=a&amp;ref=b&amp;utm_source=old#section</code></pre>
+  <p>and Source <code>launch team</code> plus Campaign <code>café 東京</code>, the preview is:</p>
+  <pre><code>https://example.com/landing?ref=a&amp;ref=b&amp;utm_source=launch+team&amp;utm_campaign=caf%C3%A9+%E6%9D%B1%E4%BA%AC#section</code></pre>
+
+  <p><strong>Verification note:</strong> The create form and live preview were inspected in Chrome with unsaved synthetic values. The application was not asked to persist those values in the demo account. API persistence, ownership, validation, routing, and redirect behavior are covered by the isolated UTM API test.</p>
+</main>
+</body>
+</html>

@@ -15,7 +15,7 @@ pnpm install
 pnpm dev
 ```
 
-Open [http://127.0.0.1:5173](http://127.0.0.1:5173). On a fresh database, create the instance's owner account with a valid email and a password of at least 12 characters. Create a named link with an HTTP(S) destination, then open **Routing rules** on its card to add ordered conditions or preview a visitor. Use the short URL shown in the workspace to redirect.
+Open [http://127.0.0.1:5173](http://127.0.0.1:5173). On a fresh database, create the instance's owner account with a valid email and a password of at least 12 characters. Create a named link with an HTTP(S) destination. Optional UTM source, medium, campaign, term, and content fields show the composed destination preview as you type; you can change or clear them later in the link's **Settings**. Open **Routing** to add ordered conditions or preview a visitor. Use the short URL shown in the workspace to redirect.
 
 On **Links**, search by name, short code, or destination, then narrow the list by tag or status. Link settings let you assign comma-separated tags, archive or restore a link, and duplicate its configuration. A duplicate gets a new short code and copies its tags and routing rules without copying click history. Archiving only hides a link from the active list; its short URL continues redirecting to the configured destination.
 
@@ -31,7 +31,7 @@ pnpm build
 
 ## Current scope
 
-The prototype includes account setup and sign-in, link create/list/edit, generated or custom short codes, owner-scoped tags and filters, active/archive views, archive/restore, configuration duplication, ordered country/device rules, side-effect-free visitor previews, 302 redirects, basic click analytics, scoped/revocable API tokens, and a local MCP stdio server. Country-based routing requires the trusted proxy configuration described above.
+The prototype includes account setup and sign-in, link create/list/edit, generated or custom short codes, optional per-link UTM campaign values with a live destination preview, owner-scoped tags and filters, active/archive views, archive/restore, configuration duplication, ordered country/device rules, side-effect-free visitor previews, 302 redirects, basic click analytics, scoped/revocable API tokens, and a local MCP stdio server. UTM values apply after the default or matching rule destination is selected. Matching UTM keys already in that destination are replaced; other query pairs and fragments are kept. Visitor query parameters are not forwarded. Country-based routing requires the trusted proxy configuration described above.
 
 Account invitations, recovery, token expiry and rate limits, date-filtered analytics, CSV export, disabling or scheduling links, QR downloads, and remote MCP transport remain on the roadmap. See the [ticket queue](docs/tickets/index.html) for proposed work, [product decisions](docs/product/2026-11-08-backlog-decisions.html) for direction, and [current architecture notes](docs/architecture/index.html) for implementation boundaries.
 

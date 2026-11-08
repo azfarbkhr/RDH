@@ -9,7 +9,16 @@
 </head>
 <body><main>
 <h1>Architecture</h1>
-<p>System boundaries, data flows, interfaces, and architecture decisions. No new architecture decision is introduced by this scaffold.</p>
-<p>This documentation scaffold was created on 8 November 2026. Product planning remains under owner review. The ticket queue starts empty.</p>
+<p>The new application separates a React browser interface, a Hono API, and SQLite persistence.</p>
+<h2>Current request flow</h2>
+<figure><pre><code>Browser (React + Vite :5173)
+  ├── /api/* ── proxy ──&gt; Hono API (:8787) ──&gt; SQLite
+  └── /l/:slug ─ proxy ──&gt; Hono redirect handler ──&gt; HTTP 302</code></pre><figcaption>The dev server keeps browser requests same-origin; Hono binds to loopback.</figcaption></figure>
+<p>Hono validates links and routing rules, checks the signed-in owner session, and writes link, rule, and click-event data to SQLite. One ordered resolver serves both live short-link redirects and the visitor simulator: a rule matches when all conditions it defines match, and the first match wins. If no rule matches, the link's default destination is used. Simulation does not record an event. Live redirects record time, coarse device class, optional country code, referrer hostname, matched rule, and bot flag. Raw IP addresses and full user-agent strings are not stored. Node's built-in <code>node:sqlite</code> avoids a native package build step.</p>
+<p>After destination selection, a shared URL composer applies each link's optional UTM source, medium, campaign, term, and content values. It removes every case-insensitive occurrence of those five keys from the selected destination, then appends the saved non-empty values once under canonical lower-case names. Other repeated query pairs and the fragment remain intact. The same composer powers the browser preview, simulator response, and live redirect. Query parameters sent to the short URL are ignored.</p>
+<h2>Current boundary</h2>
+<p>This is one local instance with an initial owner account. Registration closes after setup. Account invitations and shared workspaces are not implemented. Analytics excludes requests identified as bots and currently reports totals, recent totals, device groups, top links, and available country and matched-rule breakdowns. Country is unknown unless <code>COUNTRY_HEADER_PROVIDER=cloudflare</code> is configured behind a trusted proxy that overwrites <code>CF-IPCountry</code>; the application must not trust this header from arbitrary clients. Date filters, retention controls, token expiry, rate limiting, and broader API coverage remain in the <a href="../tickets/index.html">ticket queue</a>.</p>
+<p>The local MCP stdio process calls the authenticated Hono API with a bearer token. It registers read tools by default and exposes mutation tools only when a read/write token is supplied and an explicit process setting enables writes. Revoked tokens are denied by the API. The stdio process does not expose another network listener. The default API address is loopback; non-loopback API URLs require HTTPS. <code>PUBLIC_BASE_URL</code> provides a stable short-link origin behind a reverse proxy. Token expiry, rate limiting, and remote MCP transport remain future work.</p>
+<p>The earlier Django implementation remains under <code>redirect_hub/</code> while the new stack is developed under <code>apps/</code>. Deployment, data migration, and replacing the old entry point are undecided.</p>
 </main></body>
 </html>

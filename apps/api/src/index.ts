@@ -9,6 +9,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { db, type LinkRecord } from "./db.js";
 import { createLinkSchema, createRuleSchema, updateLinkSchema, visitorSchema } from "./schemas.js";
 import { resolveDestination, type VisitorContext } from "./routing.js";
+import { composeDestinationUrl } from "../../../packages/shared/src/utm.js";
 import { GeneratedSlugUnavailableError, insertWithGeneratedSlug, isSlugUniqueConflictError } from "./slug.js";
 
 const app = new Hono<{ Variables: { userId: string; tokenScopes: string[]; sessionAuth: boolean } }>();
@@ -36,6 +37,10 @@ const ruleOrderSchema = z.object({ direction: z.enum(["up", "down"]) });
 
 function getPublicBaseUrl(requestUrl: string) {
   return configuredPublicBase?.origin ?? new URL(requestUrl).origin;
+}
+
+function getLinkUtm(link: LinkRecord) {
+  return { source: link.utm_source, medium: link.utm_medium, campaign: link.utm_campaign, term: link.utm_term, content: link.utm_content };
 }
 
 function pointsToOwnShortUrl(destinationUrl: string, slug: string, requestUrl: string) {
@@ -219,6 +224,11 @@ function serialize(link: LinkRecord, baseUrl: string) {
     slug: link.slug,
     name: link.name,
     destinationUrl: link.destination_url,
+    utmSource: link.utm_source ?? null,
+    utmMedium: link.utm_medium ?? null,
+    utmCampaign: link.utm_campaign ?? null,
+    utmTerm: link.utm_term ?? null,
+    utmContent: link.utm_content ?? null,
     shortUrl: `${baseUrl}/l/${encodeURIComponent(link.slug)}`,
     createdAt: link.created_at,
     archivedAt: link.archived_at ?? null,
@@ -291,13 +301,18 @@ app.post("/api/links", async (c) => {
     slug,
     name: input.name,
     destination_url: input.destinationUrl,
+    utm_source: input.utmSource || null,
+    utm_medium: input.utmMedium || null,
+    utm_campaign: input.utmCampaign || null,
+    utm_term: input.utmTerm || null,
+    utm_content: input.utmContent || null,
     created_at: createdAt,
     modified_at: createdAt,
     archived_at: null,
   };
-  const insertLink = db.prepare("INSERT INTO links (id, owner_id, slug, name, destination_url, created_at, modified_at, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)");
+  const insertLink = db.prepare("INSERT INTO links (id, owner_id, slug, name, destination_url, utm_source, utm_medium, utm_campaign, utm_term, utm_content, created_at, modified_at, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)");
   if (input.slug) {
-    try { insertLink.run(link.id, link.owner_id, input.slug, link.name, link.destination_url, createdAt, createdAt); }
+    try { insertLink.run(link.id, link.owner_id, input.slug, link.name, link.destination_url, link.utm_source, link.utm_medium, link.utm_campaign, link.utm_term, link.utm_content, createdAt, createdAt); }
     catch (error) {
       if (isSlugUniqueConflictError(error)) return c.json({ error: "That short code is already in use." }, 409);
       throw error;
@@ -305,7 +320,7 @@ app.post("/api/links", async (c) => {
     link.slug = input.slug;
   } else {
     try {
-      const generated = insertWithGeneratedSlug((candidate) => insertLink.run(link.id, link.owner_id, candidate, link.name, link.destination_url, createdAt, createdAt));
+      const generated = insertWithGeneratedSlug((candidate) => insertLink.run(link.id, link.owner_id, candidate, link.name, link.destination_url, link.utm_source, link.utm_medium, link.utm_campaign, link.utm_term, link.utm_content, createdAt, createdAt));
       link.slug = generated.slug;
     } catch (error) {
       if (error instanceof GeneratedSlugUnavailableError) return c.json({ error: error.message }, 503);
@@ -318,7 +333,7 @@ app.post("/api/links", async (c) => {
 
 app.patch("/api/links/:id", async (c) => {
   const parsed = updateLinkSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) return c.json({ error: "Provide a valid link name or HTTP(S) destination." }, 400);
+  if (!parsed.success) return c.json({ error: "Provide valid link details and UTM values.", issues: parsed.error.flatten().fieldErrors }, 400);
   const existing = db.prepare("SELECT id, slug FROM links WHERE id = ? AND owner_id = ?").get(c.req.param("id"), c.get("userId")) as { id: string; slug: string } | undefined;
   if (!existing) return c.json({ error: "Link not found." }, 404);
   if (parsed.data.destinationUrl && pointsToOwnShortUrl(parsed.data.destinationUrl, existing.slug, c.req.url)) {
@@ -326,9 +341,12 @@ app.patch("/api/links/:id", async (c) => {
   }
 
   const assignments: string[] = [];
-  const values: string[] = [];
+  const values: Array<string | null> = [];
   if (parsed.data.name !== undefined) { assignments.push("name = ?"); values.push(parsed.data.name); }
   if (parsed.data.destinationUrl !== undefined) { assignments.push("destination_url = ?"); values.push(parsed.data.destinationUrl); }
+  for (const [field, column] of [["utmSource", "utm_source"], ["utmMedium", "utm_medium"], ["utmCampaign", "utm_campaign"], ["utmTerm", "utm_term"], ["utmContent", "utm_content"]] as const) {
+    if (parsed.data[field] !== undefined) { assignments.push(`${column} = ?`); values.push(parsed.data[field] || null); }
+  }
   assignments.push("modified_at = ?"); values.push(new Date().toISOString());
   values.push(c.req.param("id"), c.get("userId"));
   db.prepare(`UPDATE links SET ${assignments.join(", ")} WHERE id = ? AND owner_id = ?`).run(...values);
@@ -404,13 +422,14 @@ app.post("/api/links/:id/duplicate", (c) => {
   const createdAt = new Date().toISOString();
   const newLink: Omit<LinkRecord, "slug"> & { slug: string } = {
     id: randomUUID(), owner_id: ownerId, slug: "", name: source.name,
-    destination_url: source.destination_url, created_at: createdAt,
+    destination_url: source.destination_url, utm_source: source.utm_source, utm_medium: source.utm_medium,
+    utm_campaign: source.utm_campaign, utm_term: source.utm_term, utm_content: source.utm_content, created_at: createdAt,
     modified_at: createdAt, archived_at: null,
   };
   db.exec("BEGIN IMMEDIATE");
   try {
-    const insertLink = db.prepare("INSERT INTO links (id, owner_id, slug, name, destination_url, created_at, modified_at, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)");
-    const generated = insertWithGeneratedSlug((slug) => insertLink.run(newLink.id, ownerId, slug, newLink.name, newLink.destination_url, createdAt, createdAt));
+    const insertLink = db.prepare("INSERT INTO links (id, owner_id, slug, name, destination_url, utm_source, utm_medium, utm_campaign, utm_term, utm_content, created_at, modified_at, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)");
+    const generated = insertWithGeneratedSlug((slug) => insertLink.run(newLink.id, ownerId, slug, newLink.name, newLink.destination_url, newLink.utm_source, newLink.utm_medium, newLink.utm_campaign, newLink.utm_term, newLink.utm_content, createdAt, createdAt));
     newLink.slug = generated.slug;
     const sourceTags = db.prepare("SELECT tag_id FROM link_tags WHERE link_id = ? AND owner_id = ?").all(source.id, ownerId) as Array<{ tag_id: string }>;
     const attachTag = db.prepare("INSERT INTO link_tags (link_id, tag_id, owner_id) VALUES (?, ?, ?)");
@@ -503,7 +522,7 @@ app.post("/api/links/:id/simulate", async (c) => {
   if (!parsed.success) return c.json({ error: "Use a two-letter country code and a supported device value." }, 400);
   const context: VisitorContext = { countryCode: parsed.data.countryCode?.toUpperCase() ?? null, device: parsed.data.device ?? "unknown" };
   const resolved = resolveDestination(db, link, context);
-  return c.json({ ...resolved, matched: resolved.matchedRuleId !== null, context });
+  return c.json({ ...resolved, destinationUrl: composeDestinationUrl(resolved.destinationUrl, getLinkUtm(link)), matched: resolved.matchedRuleId !== null, context });
 });
 
 app.get("/l/:slug", (c) => {
@@ -522,7 +541,7 @@ app.get("/l/:slug", (c) => {
   const resolved = resolveDestination(db, link, visitor);
   db.prepare("INSERT INTO click_events (id, link_id, matched_rule_id, country_code, device, referrer_host, is_bot) VALUES (?, ?, ?, ?, ?, ?, ?)")
     .run(randomUUID(), link.id, resolved.matchedRuleId, visitor.countryCode, device, referrerHost, isBot ? 1 : 0);
-  return c.redirect(resolved.destinationUrl, 302);
+  return c.redirect(composeDestinationUrl(resolved.destinationUrl, getLinkUtm(link)), 302);
 });
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

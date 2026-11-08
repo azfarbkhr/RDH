@@ -44,6 +44,11 @@ db.exec(`
     slug TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
     destination_url TEXT NOT NULL,
+    utm_source TEXT,
+    utm_medium TEXT,
+    utm_campaign TEXT,
+    utm_term TEXT,
+    utm_content TEXT,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     modified_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   );
@@ -82,6 +87,9 @@ if (!linkColumns.some((column) => column.name === "archived_at")) {
 if (!linkColumns.some((column) => column.name === "modified_at")) {
   db.exec("ALTER TABLE links ADD COLUMN modified_at TEXT NOT NULL DEFAULT ''");
   db.exec("UPDATE links SET modified_at = created_at WHERE modified_at = ''");
+}
+for (const column of ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"]) {
+  if (!linkColumns.some((existing) => existing.name === column)) db.exec(`ALTER TABLE links ADD COLUMN ${column} TEXT`);
 }
 if (!clickColumns.some((column) => column.name === "matched_rule_id")) {
   db.exec("ALTER TABLE click_events ADD COLUMN matched_rule_id TEXT");
@@ -124,6 +132,11 @@ export interface LinkRecord {
   slug: string;
   name: string;
   destination_url: string;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_term: string | null;
+  utm_content: string | null;
   created_at: string;
   modified_at: string;
   archived_at: string | null;

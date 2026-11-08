@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { composeDestinationUrl, UTM_FIELDS, type UtmField } from "../../../packages/shared/src/utm.js";
 import "./styles.css";
 
 type LinkItem = {
@@ -7,6 +8,11 @@ type LinkItem = {
   slug: string;
   name: string;
   destinationUrl: string;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  utmTerm: string | null;
+  utmContent: string | null;
   shortUrl: string;
   createdAt: string;
   clickCount?: number;
@@ -20,6 +26,14 @@ type Analytics = { totalClicks: number; lastSevenDays: number; countries?: Array
 type User = { id: string; email: string };
 type RouteRule = { id: string; priority: number; countryCode: string | null; device: "mobile" | "desktop" | null; destinationUrl: string };
 type ApiToken = { id: string; name: string; scopes: string; createdAt: string; lastUsedAt: string | null };
+type UtmForm = Record<UtmField, string>;
+const emptyUtm: UtmForm = { source: "", medium: "", campaign: "", term: "", content: "" };
+const utmLabels: Record<UtmField, string> = { source: "Source", medium: "Medium", campaign: "Campaign", term: "Term", content: "Content" };
+
+function UtmFields({ prefix, destination, values, onChange }: { prefix: string; destination: string; values: UtmForm; onChange: (field: UtmField, value: string) => void }) {
+  const preview = destination.trim() ? (() => { try { return composeDestinationUrl(destination.trim(), values); } catch { return "Enter a valid destination URL to preview UTM values."; } })() : "Enter a destination URL to preview UTM values.";
+  return <fieldset className="utm-builder"><legend>Campaign tracking <span className="optional">OPTIONAL</span></legend><p>Add values to this link’s destination. Each value supports up to 200 Unicode characters. Blank fields remove matching UTM values already on the destination.</p><div className="utm-fields">{UTM_FIELDS.map((field) => <label key={field} htmlFor={`${prefix}-utm-${field}`}>UTM {utmLabels[field]}<input id={`${prefix}-utm-${field}`} value={values[field]} onChange={(event) => onChange(field, event.target.value)} placeholder={utmLabels[field]} /></label>)}</div><div className="utm-preview"><span>FINAL DESTINATION PREVIEW</span><code>{preview}</code></div></fieldset>;
+}
 type WorkspaceRoute = "overview" | "links" | "create" | "analytics" | "developer" | "link";
 
 function readRoute() {
@@ -229,10 +243,12 @@ function App() {
   const [configured, setConfigured] = useState(false);
   const [name, setName] = useState("");
   const [destinationUrl, setDestinationUrl] = useState("");
+  const [createUtm, setCreateUtm] = useState<UtmForm>(emptyUtm);
   const [slug, setSlug] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editDestination, setEditDestination] = useState("");
+  const [editUtm, setEditUtm] = useState<UtmForm>(emptyUtm);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -307,12 +323,13 @@ function App() {
       const response = await fetch("/api/links", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, destinationUrl, ...(slug.trim() ? { slug: slug.trim() } : {}) }),
+        body: JSON.stringify({ name, destinationUrl, ...Object.fromEntries(UTM_FIELDS.map((field) => [`utm${field[0].toUpperCase()}${field.slice(1)}`, createUtm[field]])), ...(slug.trim() ? { slug: slug.trim() } : {}) }),
       });
       const data = await response.json() as { link?: LinkItem; error?: string };
       if (!response.ok || !data.link) throw new Error(data.error ?? "Couldn't create this link.");
       setName("");
       setDestinationUrl("");
+      setCreateUtm(emptyUtm);
       setSlug("");
       await refresh();
       navigate("link", data.link.id);
@@ -362,7 +379,7 @@ function App() {
     try {
       const response = await fetch(`/api/links/${encodeURIComponent(linkId)}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editName, destinationUrl: editDestination }),
+        body: JSON.stringify({ name: editName, destinationUrl: editDestination, ...Object.fromEntries(UTM_FIELDS.map((field) => [`utm${field[0].toUpperCase()}${field.slice(1)}`, editUtm[field]])) }),
       });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "Couldn't update this link.");
@@ -407,6 +424,7 @@ function App() {
               <input id="link-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Product launch" maxLength={80} required />
               <label htmlFor="destination">Destination URL <span className="required">*</span></label>
               <input id="destination" type="url" value={destinationUrl} onChange={(event) => setDestinationUrl(event.target.value)} placeholder="https://example.com/your-page" maxLength={2048} required />
+              <UtmFields prefix="create" destination={destinationUrl} values={createUtm} onChange={(field, value) => setCreateUtm((current) => ({ ...current, [field]: value }))} />
               <label htmlFor="custom-slug">Short code <span className="optional">OPTIONAL</span></label>
               <div className="slug-input"><span className="slug-prefix">/l/</span><input id="custom-slug" value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="auto-generated" maxLength={48} pattern="[a-zA-Z0-9_-]{3,48}" title="Use 3–48 letters, numbers, hyphens, or underscores." /><span className="slug-hint" aria-hidden="true">↗</span></div>
               <button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Creating link…" : "Create short link"}<span aria-hidden="true">→</span></button>
@@ -424,11 +442,11 @@ function App() {
         {route.page === "link" && (activeLink ? <section className="link-detail-page">
           <button className="back-link" onClick={() => navigate("links")}>← Back to links</button>
           <div className="page-intro detail-intro"><div><div className="eyebrow">LINK DETAILS · /l/{activeLink.slug}</div><h1>{activeLink.name}</h1><p className="intro-copy">{activeLink.destinationUrl}</p></div><button className="copy-button" onClick={() => void copyLink(activeLink.shortUrl)}>Copy short link</button></div>
-          <nav className="detail-tabs" aria-label="Link sections">{(["overview", "routing", "analytics", "settings"] as const).map((section) => <button key={section} aria-current={detailSection === section ? "page" : undefined} onClick={() => { setDetailSection(section); setEditName(activeLink.name); setEditDestination(activeLink.destinationUrl); setEditTags((activeLink.tags ?? []).join(", ")); }}>{section[0].toUpperCase() + section.slice(1)}</button>)}</nav>
+          <nav className="detail-tabs" aria-label="Link sections">{(["overview", "routing", "analytics", "settings"] as const).map((section) => <button key={section} aria-current={detailSection === section ? "page" : undefined} onClick={() => { setDetailSection(section); setEditName(activeLink.name); setEditDestination(activeLink.destinationUrl); setEditUtm({ source: activeLink.utmSource ?? "", medium: activeLink.utmMedium ?? "", campaign: activeLink.utmCampaign ?? "", term: activeLink.utmTerm ?? "", content: activeLink.utmContent ?? "" }); setEditTags((activeLink.tags ?? []).join(", ")); }}>{section[0].toUpperCase() + section.slice(1)}</button>)}</nav>
           {detailSection === "overview" && <section className="detail-grid"><article className="panel detail-card"><span className="eyebrow">SHORT LINK</span><a className="detail-short-url" href={activeLink.shortUrl}>{activeLink.shortUrl}</a><button className="copy-button" onClick={() => void copyLink(activeLink.shortUrl)}>Copy URL</button></article><article className="panel detail-card"><span className="eyebrow">DESTINATION</span><a className="detail-destination" href={activeLink.destinationUrl} target="_blank" rel="noreferrer">{activeLink.destinationUrl} ↗</a><small>Created {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(activeLink.createdAt))}</small></article><article className="panel detail-card"><span className="eyebrow">LINK ACTIVITY</span><strong className="detail-metric">{typeof activeLink.clickCount === "number" ? activeLink.clickCount.toLocaleString() : "—"}</strong><small>{typeof activeLink.clickCount === "number" ? "Recorded clicks" : "Open workspace analytics for activity"}</small></article></section>}
           {detailSection === "routing" && <section className="panel detail-wide"><div className="section-heading"><div><div className="eyebrow">DESTINATION RULES</div><h2>Routing</h2><p>Send different visitors to a destination that fits them.</p></div></div><RoutingEditor key={activeLink.id} link={activeLink}/></section>}
           {detailSection === "analytics" && <section className="panel detail-wide"><div className="eyebrow">LINK PERFORMANCE</div><h2>Analytics for {activeLink.name}</h2><div className="empty-state"><p>Per-link analytics are not available yet. Workspace-wide traffic is available on Analytics.</p><button className="text-action" onClick={() => navigate("analytics")}>Open workspace analytics →</button></div></section>}
-          {detailSection === "settings" && <section className="panel detail-wide"><div className="eyebrow">LINK SETTINGS</div><h2>Update this link</h2><p>The short URL stays the same when you change its name or destination.</p><form className="link-form settings-form" onSubmit={(event) => void saveLink(event, activeLink.id)}><label htmlFor={`edit-name-${activeLink.id}`}>Link name</label><input id={`edit-name-${activeLink.id}`} value={editName} onChange={(event) => setEditName(event.target.value)} required maxLength={80}/><label htmlFor={`edit-destination-${activeLink.id}`}>Destination URL</label><input id={`edit-destination-${activeLink.id}`} type="url" value={editDestination} onChange={(event) => setEditDestination(event.target.value)} required maxLength={2048}/><div className="form-actions"><button className="primary-button" type="submit">Save changes</button><button className="copy-button" type="button" onClick={() => setDetailSection("overview")}>Cancel</button></div></form><form className="link-form settings-form tag-editor" onSubmit={(event) => { event.preventDefault(); void saveTags(activeLink.id); }}><label htmlFor={`edit-tags-${activeLink.id}`}>Tags <span className="optional">COMMA SEPARATED</span></label><input id={`edit-tags-${activeLink.id}`} value={editTags} onChange={(event) => setEditTags(event.target.value)} placeholder="Launch, Social, Q4"/><button className="copy-button" type="submit">Save tags</button></form><div className="archive-control"><div><strong>{activeLink.archivedAt ? "This link is archived" : "Archive this link"}</strong><p>{activeLink.archivedAt ? "It remains reachable and continues redirecting visitors." : "The short URL will keep redirecting after you archive it."}</p></div><button className="copy-button" onClick={() => void manageLink(activeLink.id, activeLink.archivedAt ? "unarchive" : "archive")}>{activeLink.archivedAt ? "Restore link" : "Archive link"}</button></div><div className="form-actions duplicate-control"><button className="copy-button" onClick={() => void manageLink(activeLink.id, "duplicate")}>Duplicate link</button></div></section>}
+          {detailSection === "settings" && <section className="panel detail-wide"><div className="eyebrow">LINK SETTINGS</div><h2>Update this link</h2><p>The short URL stays the same when you change its name or destination.</p><form className="link-form settings-form" onSubmit={(event) => void saveLink(event, activeLink.id)}><label htmlFor={`edit-name-${activeLink.id}`}>Link name</label><input id={`edit-name-${activeLink.id}`} value={editName} onChange={(event) => setEditName(event.target.value)} required maxLength={80}/><label htmlFor={`edit-destination-${activeLink.id}`}>Destination URL</label><input id={`edit-destination-${activeLink.id}`} type="url" value={editDestination} onChange={(event) => setEditDestination(event.target.value)} required maxLength={2048}/><UtmFields prefix={`edit-${activeLink.id}`} destination={editDestination} values={editUtm} onChange={(field, value) => setEditUtm((current) => ({ ...current, [field]: value }))} /><div className="form-actions"><button className="primary-button" type="submit">Save changes</button><button className="copy-button" type="button" onClick={() => setDetailSection("overview")}>Cancel</button></div></form><form className="link-form settings-form tag-editor" onSubmit={(event) => { event.preventDefault(); void saveTags(activeLink.id); }}><label htmlFor={`edit-tags-${activeLink.id}`}>Tags <span className="optional">COMMA SEPARATED</span></label><input id={`edit-tags-${activeLink.id}`} value={editTags} onChange={(event) => setEditTags(event.target.value)} placeholder="Launch, Social, Q4"/><button className="copy-button" type="submit">Save tags</button></form><div className="archive-control"><div><strong>{activeLink.archivedAt ? "This link is archived" : "Archive this link"}</strong><p>{activeLink.archivedAt ? "It remains reachable and continues redirecting visitors." : "The short URL will keep redirecting after you archive it."}</p></div><button className="copy-button" onClick={() => void manageLink(activeLink.id, activeLink.archivedAt ? "unarchive" : "archive")}>{activeLink.archivedAt ? "Restore link" : "Archive link"}</button></div><div className="form-actions duplicate-control"><button className="copy-button" onClick={() => void manageLink(activeLink.id, "duplicate")}>Duplicate link</button></div></section>}
         </section> : <div className="empty-state"><h1>Link not found</h1><p>This link may have been removed or belongs to another workspace.</p><button className="primary-button" onClick={() => navigate("links")}>Back to links</button></div>)}
         {route.page === "developer" && <section className="developer-page"><div className="page-intro"><div><div className="eyebrow">BUILD WITH REDIRECT HUB</div><h1>Developer access</h1><p className="intro-copy">Manage credentials for your API tools and local MCP setup.</p></div></div><ApiTokenPanel presentation="page" onClose={() => undefined}/></section>}
       </main>

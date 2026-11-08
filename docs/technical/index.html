@@ -9,7 +9,35 @@
 </head>
 <body><main>
 <h1>Technical</h1>
-<p>Verified developer setup, implementation, configuration, testing, and operations. The application was not started or tested as part of this import.</p>
-<p>This documentation scaffold was created on 8 November 2026. Product planning remains under owner review. The ticket queue starts empty.</p>
+<p>The current application has a Vite-served React interface, a TypeScript API built with Hono and <code>@hono/node-server</code>, and a local SQLite database accessed through Node's <code>node:sqlite</code> module.</p>
+<h2>Run the development workspace</h2>
+<p>From the repository root, use Node.js 22 or later and pnpm:</p>
+<pre><code>pnpm install
+pnpm dev</code></pre>
+<p>Open <code>http://127.0.0.1:5173</code>. Vite serves the interface and proxies <code>/api</code> and <code>/l</code> requests to Hono on <code>127.0.0.1:8787</code>.</p>
+<p>The API creates <code>data/redirect-hub.sqlite</code> at the repository root on startup. Set <code>DATABASE_PATH</code> to change its location or <code>PORT</code> to change the API port. Behind a reverse proxy, set <code>PUBLIC_BASE_URL</code> to the public HTTP(S) origin (without a path) and route <code>/api</code> and <code>/l</code> to Hono. Short URLs then use that canonical host, and direct self-redirect checks use the same origin.</p>
+<h2>Local MCP server</h2>
+<p>A local stdio server is available with <code>pnpm mcp</code>. For an MCP host, launch Node directly from <code>apps/api/</code> with <code>--import tsx src/mcp.ts</code> so package-manager messages do not enter the protocol stream. Set <code>REDIRECT_HUB_API_URL</code> and <code>REDIRECT_HUB_API_TOKEN</code> in the host configuration. Read tools are registered by default. To register write tools, set <code>REDIRECT_HUB_MCP_ALLOW_WRITES=1</code> and supply a read/write token. See the <a href="../user-guides/local-mcp.html">local MCP setup guide</a>.</p>
+<p>The MCP process defaults to the Hono API on loopback and inherits its owner checks and API-token scopes. A non-loopback API URL must use HTTPS. The MCP transport itself is local stdio; remote MCP transport has not been added.</p>
+<h2>Current API</h2>
+<ul>
+<li><code>GET /api/health</code> returns a service health response.</li>
+<li><code>GET /api/auth/session</code>, <code>POST /api/auth/register</code>, <code>POST /api/auth/login</code>, and <code>POST /api/auth/logout</code> report or change the owner session. Registration creates the first account only.</li>
+<li><code>GET /api/auth/tokens</code>, <code>POST /api/auth/tokens</code>, and <code>DELETE /api/auth/tokens/:id</code> manage an owner's hashed read or read/write bearer tokens. A token value is returned only once at creation.</li>
+<li><code>GET /api/links</code> lists links owned by the signed-in account.</li>
+<li><code>POST /api/links</code> creates a link owned by the signed-in account with a name, HTTP(S) destination, optional custom slug, and optional UTM source, medium, campaign, term, and content values.</li>
+<li><code>PATCH /api/links/:id</code> updates the signed-in owner's link name, HTTP(S) destination, or optional UTM source/medium/campaign/term/content values while preserving the short URL. UTM values are trimmed, limited to 200 Unicode code points, and cleared with null, empty, or whitespace-only values; omitted PATCH values are unchanged.</li>
+<li><code>GET /api/links/:id/rules</code> lists ordered routing rules; <code>POST</code> on the same path adds a country and/or device rule, up to 20 per link.</li>
+<li><code>DELETE /api/links/:id/rules/:ruleId</code> removes an owner-scoped rule; <code>PATCH /api/links/:id/rules/:ruleId/priority</code> moves a rule up or down.</li>
+<li><code>POST /api/links/:id/simulate</code> previews a visitor's selected destination after applying that link's saved UTM values, without recording a click.</li>
+<li><code>GET /api/analytics</code> returns bot-filtered click totals, last-seven-day totals, device groups, top links, and available country and matched-rule aggregates.</li>
+<li><code>GET /l/:slug</code> resolves the first matching rule, then applies saved link-level UTM values and returns a temporary redirect. With no match, the link's saved destination is used. Visitor query parameters are not forwarded. Existing destination UTM keys are replaced, repeated non-UTM query pairs and the fragment are preserved.</li>
+</ul>
+<p>Build with <code>pnpm build</code>. The frontend and API build separately inside <code>apps/web/</code> and <code>apps/api/</code>.</p>
+<h2>Prototype boundary</h2>
+<p>This vertical slice has one owner account per instance. Sessions are opaque random tokens whose hashes are stored in SQLite; the browser cookie is HTTP-only and SameSite Lax. Passwords use Node.js scrypt. There is no account invitation or password recovery yet. The API binds to loopback. Do not expose it to a network before deployment security, account recovery, and operational setup are complete.</p>
+<p>Country is only derived from <code>CF-IPCountry</code> when <code>COUNTRY_HEADER_PROVIDER=cloudflare</code>; enable this only behind a trusted proxy configured to replace the header. Device classification is coarse. Referrer hostname is recorded but is not currently returned as an analytics breakdown. Token expiry, automatic rotation, retention controls, remote MCP transport, date filters, and CSV export have not been implemented.</p>
+<p>The repository also contains the earlier Django prototype in <code>redirect_hub/</code>. The new Node/React workspace lives in <code>apps/</code>; migration or removal of the Django source has not been done.</p>
+<p>Product direction and delivery proposals are in the <a href="../product/2026-11-08-backlog-decisions.html">product decisions</a> and <a href="../tickets/index.html">ticket queue</a>.</p>
 </main></body>
 </html>

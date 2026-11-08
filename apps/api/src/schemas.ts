@@ -4,9 +4,21 @@ export const createLinkSchema = z.object({
   name: z.string().trim().min(1).max(80),
   destinationUrl: z.url().max(2048).refine((value) => ["http:", "https:"].includes(new URL(value).protocol), "Use an http or https URL."),
   slug: z.string().trim().min(3).max(48).regex(/^[a-zA-Z0-9_-]+$/, "Use letters, numbers, hyphens, or underscores.").optional(),
+  utmSource: z.string().trim().refine((value) => Array.from(value).length <= 200, "Use no more than 200 characters.").optional(),
+  utmMedium: z.string().trim().refine((value) => Array.from(value).length <= 200, "Use no more than 200 characters.").optional(),
+  utmCampaign: z.string().trim().refine((value) => Array.from(value).length <= 200, "Use no more than 200 characters.").optional(),
+  utmTerm: z.string().trim().refine((value) => Array.from(value).length <= 200, "Use no more than 200 characters.").optional(),
+  utmContent: z.string().trim().refine((value) => Array.from(value).length <= 200, "Use no more than 200 characters.").optional(),
 });
 
-export const updateLinkSchema = createLinkSchema.pick({ name: true, destinationUrl: true }).partial().refine((value) => Object.keys(value).length > 0, "Provide at least one field to update.");
+const utmUpdateValue = z.string().trim().refine((value) => Array.from(value).length <= 200, "Use no more than 200 characters.").nullable();
+export const updateLinkSchema = createLinkSchema.pick({ name: true, destinationUrl: true }).extend({
+  utmSource: utmUpdateValue.optional(),
+  utmMedium: utmUpdateValue.optional(),
+  utmCampaign: utmUpdateValue.optional(),
+  utmTerm: utmUpdateValue.optional(),
+  utmContent: utmUpdateValue.optional(),
+}).partial().refine((value) => Object.keys(value).length > 0, "Provide at least one field to update.");
 
 export const createRuleSchema = z.object({
   countryCode: z.string().trim().regex(/^[A-Za-z]{2}$/, "Use a two-letter country code.").optional(),
