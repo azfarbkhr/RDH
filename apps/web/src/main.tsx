@@ -10,7 +10,10 @@ type LinkItem = {
   shortUrl: string;
   createdAt: string;
   clickCount?: number;
+  archivedAt?: string | null;
+  tags?: string[];
 };
+type TagItem = { id: string; name: string; linkCount: number };
 
 type Analytics = { totalClicks: number; lastSevenDays: number; countries?: Array<{ countryCode: string; clicks: number }>; devices?: Array<{ device: string; clicks: number }>; topLinks?: Array<{ id: string; name: string; slug: string; clicks: number }>; rules?: Array<{ ruleId: string; priority: number; countryCode: string | null; device: string | null; linkName: string; clicks: number }> };
 
@@ -237,6 +240,10 @@ function App() {
   const [route, setRoute] = useState(() => readRoute());
   const [detailSection, setDetailSection] = useState<"overview" | "routing" | "analytics" | "settings">("overview");
   const [search, setSearch] = useState("");
+  const [archiveView, setArchiveView] = useState<"active" | "archived" | "all">("active");
+  const [selectedTag, setSelectedTag] = useState("");
+  const [tags, setTags] = useState<TagItem[]>([]);
+  const [editTags, setEditTags] = useState("");
 
   function navigate(page: WorkspaceRoute, linkId?: string) {
     const hash = page === "link" && linkId ? `#/link/${encodeURIComponent(linkId)}` : `#/${page}`;
@@ -252,20 +259,24 @@ function App() {
     return () => window.removeEventListener("hashchange", updateRoute);
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (overrides: { archive?: "active" | "archived" | "all" } = {}) => {
     try {
-      const [response, analyticsResponse] = await Promise.all([fetch("/api/links"), fetch("/api/analytics")]);
-      if (!response.ok || !analyticsResponse.ok) throw new Error("Could not load your links.");
-      const [data, analyticsData] = await Promise.all([response.json(), analyticsResponse.json()]) as [{ links: LinkItem[] }, Analytics];
+      const params = new URLSearchParams({ archive: overrides.archive ?? archiveView });
+      if (search.trim()) params.set("search", search.trim());
+      if (selectedTag) params.set("tag", selectedTag);
+      const [response, analyticsResponse, tagsResponse] = await Promise.all([fetch(`/api/links?${params}`), fetch("/api/analytics"), fetch("/api/tags")]);
+      if (!response.ok || !analyticsResponse.ok || !tagsResponse.ok) throw new Error("Could not load your links.");
+      const [data, analyticsData, tagsData] = await Promise.all([response.json(), analyticsResponse.json(), tagsResponse.json()]) as [{ links: LinkItem[] }, Analytics, { tags: TagItem[] }];
       setLinks(data.links);
       setAnalytics(analyticsData);
+      setTags(tagsData.tags);
       setError("");
     } catch {
       setError("Couldn't connect to Redirect Hub. Check that the API server is running, then try again.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [archiveView, search, selectedTag]);
 
   useEffect(() => {
     void fetch("/api/auth/session").then((response) => response.json()).then((data: { user: User | null; configured: boolean }) => {
@@ -322,6 +333,30 @@ function App() {
     }
   }
 
+  async function manageLink(linkId: string, action: "archive" | "unarchive" | "duplicate") {
+    setError(""); setNotice("");
+    try {
+      const response = await fetch(`/api/links/${encodeURIComponent(linkId)}/${action}`, { method: "POST" });
+      const data = await response.json() as { link?: LinkItem; error?: string };
+      if (!response.ok || !data.link) throw new Error(data.error ?? `Couldn't ${action} this link.`);
+      const nextView = action === "archive" ? "archived" : "active";
+      setArchiveView(nextView);
+      await refresh({ archive: nextView });
+      if (action === "duplicate") { navigate("link", data.link.id); setNotice("Link duplicated with a new short URL."); }
+      else { navigate("links"); setNotice(action === "archive" ? "Link archived. Its short URL still redirects." : "Link restored to active links."); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : `Couldn't ${action} this link.`); }
+  }
+
+  async function saveTags(linkId: string) {
+    setError(""); setNotice("");
+    try {
+      const response = await fetch(`/api/links/${encodeURIComponent(linkId)}/tags`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tags: editTags.split(",").map((tag) => tag.trim()).filter(Boolean) }) });
+      const data = await response.json() as { link?: LinkItem; error?: string };
+      if (!response.ok || !data.link) throw new Error(data.error ?? "Couldn't save tags.");
+      setNotice("Tags saved."); await refresh();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Couldn't save tags."); }
+  }
+
   async function saveLink(event: React.FormEvent<HTMLFormElement>, linkId: string) {
     event.preventDefault(); setError(""); setNotice("");
     try {
@@ -336,7 +371,7 @@ function App() {
   }
 
   const activeLink = links.find((link) => link.id === route.linkId) ?? null;
-  const visibleLinks = links.filter((link) => `${link.name} ${link.slug} ${link.destinationUrl}`.toLowerCase().includes(search.toLowerCase()));
+  const visibleLinks = links;
 
   return (
     <div className="app-shell">
@@ -381,18 +416,19 @@ function App() {
 
           {route.page === "links" && <section id="links" className="links-section" aria-labelledby="links-heading">
             <div className="page-intro"><div><div className="eyebrow">LINK LIBRARY</div><h1 id="links-heading">Your links <span className="count-pill">{loading ? "…" : links.length}</span></h1><p className="intro-copy">Find, copy, and manage every destination in your collection.</p></div><button className="primary-button" onClick={() => navigate("create")}>Create link →</button></div>
-            <div className="link-tools"><label className="search-field"><span aria-hidden="true">⌕</span><span className="visually-hidden">Search links</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search links by name or destination" /></label><button className="refresh-button" onClick={() => void refresh()} aria-label="Refresh links">↻</button></div>
-            {loading ? <div className="empty-state"><span className="empty-icon" aria-hidden="true">◌</span><p>Loading your links…</p></div> : visibleLinks.length === 0 ? <div className="empty-state"><span className="empty-icon" aria-hidden="true">↗</span><h3>{links.length ? "No matching links" : "No links yet"}</h3><p>{links.length ? "Try another name or destination." : "Create a short link and it’ll be ready to share."}</p>{!links.length && <button className="primary-button" onClick={() => navigate("create")}>Create a link</button>}</div> : <div className="link-list">{visibleLinks.map((link) => <article className="link-card" key={link.id}><div className="link-card-top"><div className="link-description"><button className="link-name-button" onClick={() => navigate("link", link.id)}>{link.name}</button><time dateTime={link.createdAt}>{new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(link.createdAt))}</time></div><span className="link-clicks">{typeof link.clickCount === "number" ? `${link.clickCount} clicks` : "— clicks"}</span><button className="copy-button" onClick={() => void copyLink(link.shortUrl)}>Copy</button><button className="copy-button" onClick={() => navigate("link", link.id)}>Details</button></div><a className="short-link" href={link.shortUrl}>{link.shortUrl}</a><div className="destination"><span>GOES TO</span><a href={link.destinationUrl} target="_blank" rel="noreferrer" title={link.destinationUrl}>{link.destinationUrl}<span aria-hidden="true"> ↗</span></a></div></article>)}</div>}
+            <div className="link-tools"><label className="search-field"><span aria-hidden="true">⌕</span><span className="visually-hidden">Search links</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search links by name, code, or destination" /></label><button className="refresh-button" onClick={() => void refresh()} aria-label="Refresh links">↻</button></div>
+            <div className="link-filters" aria-label="Filter links"><div className="archive-tabs" role="group" aria-label="Link status">{(["active", "archived", "all"] as const).map((view) => <button key={view} type="button" aria-pressed={archiveView === view} onClick={() => setArchiveView(view)}>{view === "active" ? "Active" : view === "archived" ? "Archived" : "All links"}</button>)}</div><label className="tag-filter">Tag<select value={selectedTag} onChange={(event) => setSelectedTag(event.target.value)}><option value="">All tags</option>{tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name} ({tag.linkCount})</option>)}</select></label></div>
+            {loading ? <div className="empty-state"><span className="empty-icon" aria-hidden="true">◌</span><p>Loading your links…</p></div> : visibleLinks.length === 0 ? <div className="empty-state"><span className="empty-icon" aria-hidden="true">↗</span><h3>{search || selectedTag ? "No matching links" : archiveView === "archived" ? "No archived links" : archiveView === "active" ? "No active links yet" : "No links yet"}</h3><p>{search || selectedTag ? "Try a different search or tag." : archiveView === "archived" ? "Archived links stay available here and keep redirecting." : "Create a short link and it’ll be ready to share."}</p>{archiveView !== "archived" && !search && !selectedTag && <button className="primary-button" onClick={() => navigate("create")}>Create a link</button>}</div> : <div className="link-list">{visibleLinks.map((link) => <article className="link-card" key={link.id}><div className="link-card-top"><div className="link-description"><button className="link-name-button" onClick={() => navigate("link", link.id)}>{link.name}</button><time dateTime={link.createdAt}>{new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(link.createdAt))}{link.archivedAt ? " · Archived" : ""}</time></div><span className="link-clicks">{typeof link.clickCount === "number" ? `${link.clickCount} clicks` : "— clicks"}</span><button className="copy-button" onClick={() => void copyLink(link.shortUrl)}>Copy</button><button className="copy-button" onClick={() => navigate("link", link.id)}>Details</button></div><a className="short-link" href={link.shortUrl}>{link.shortUrl}</a><div className="destination"><span>GOES TO</span><a href={link.destinationUrl} target="_blank" rel="noreferrer" title={link.destinationUrl}>{link.destinationUrl}<span aria-hidden="true"> ↗</span></a></div><div className="link-card-bottom">{(link.tags ?? []).length ? <div className="tag-chips">{link.tags!.map((tag) => <span key={tag}>{tag}</span>)}</div> : <span className="no-tags">No tags</span>}<div className="link-actions"><button className="copy-button" onClick={() => void manageLink(link.id, "duplicate")}>Duplicate</button><button className="copy-button" onClick={() => void manageLink(link.id, link.archivedAt ? "unarchive" : "archive")}>{link.archivedAt ? "Restore" : "Archive"}</button></div></div></article>)}</div>}
           </section>}
         </div>
         {route.page === "link" && (activeLink ? <section className="link-detail-page">
           <button className="back-link" onClick={() => navigate("links")}>← Back to links</button>
           <div className="page-intro detail-intro"><div><div className="eyebrow">LINK DETAILS · /l/{activeLink.slug}</div><h1>{activeLink.name}</h1><p className="intro-copy">{activeLink.destinationUrl}</p></div><button className="copy-button" onClick={() => void copyLink(activeLink.shortUrl)}>Copy short link</button></div>
-          <nav className="detail-tabs" aria-label="Link sections">{(["overview", "routing", "analytics", "settings"] as const).map((section) => <button key={section} aria-current={detailSection === section ? "page" : undefined} onClick={() => { setDetailSection(section); setEditName(activeLink.name); setEditDestination(activeLink.destinationUrl); }}>{section[0].toUpperCase() + section.slice(1)}</button>)}</nav>
+          <nav className="detail-tabs" aria-label="Link sections">{(["overview", "routing", "analytics", "settings"] as const).map((section) => <button key={section} aria-current={detailSection === section ? "page" : undefined} onClick={() => { setDetailSection(section); setEditName(activeLink.name); setEditDestination(activeLink.destinationUrl); setEditTags((activeLink.tags ?? []).join(", ")); }}>{section[0].toUpperCase() + section.slice(1)}</button>)}</nav>
           {detailSection === "overview" && <section className="detail-grid"><article className="panel detail-card"><span className="eyebrow">SHORT LINK</span><a className="detail-short-url" href={activeLink.shortUrl}>{activeLink.shortUrl}</a><button className="copy-button" onClick={() => void copyLink(activeLink.shortUrl)}>Copy URL</button></article><article className="panel detail-card"><span className="eyebrow">DESTINATION</span><a className="detail-destination" href={activeLink.destinationUrl} target="_blank" rel="noreferrer">{activeLink.destinationUrl} ↗</a><small>Created {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(activeLink.createdAt))}</small></article><article className="panel detail-card"><span className="eyebrow">LINK ACTIVITY</span><strong className="detail-metric">{typeof activeLink.clickCount === "number" ? activeLink.clickCount.toLocaleString() : "—"}</strong><small>{typeof activeLink.clickCount === "number" ? "Recorded clicks" : "Open workspace analytics for activity"}</small></article></section>}
           {detailSection === "routing" && <section className="panel detail-wide"><div className="section-heading"><div><div className="eyebrow">DESTINATION RULES</div><h2>Routing</h2><p>Send different visitors to a destination that fits them.</p></div></div><RoutingEditor key={activeLink.id} link={activeLink}/></section>}
           {detailSection === "analytics" && <section className="panel detail-wide"><div className="eyebrow">LINK PERFORMANCE</div><h2>Analytics for {activeLink.name}</h2><div className="empty-state"><p>Per-link analytics are not available yet. Workspace-wide traffic is available on Analytics.</p><button className="text-action" onClick={() => navigate("analytics")}>Open workspace analytics →</button></div></section>}
-          {detailSection === "settings" && <section className="panel detail-wide"><div className="eyebrow">LINK SETTINGS</div><h2>Update this link</h2><p>The short URL stays the same when you change its name or destination.</p><form className="link-form settings-form" onSubmit={(event) => void saveLink(event, activeLink.id)}><label htmlFor={`edit-name-${activeLink.id}`}>Link name</label><input id={`edit-name-${activeLink.id}`} value={editName} onChange={(event) => setEditName(event.target.value)} required maxLength={80}/><label htmlFor={`edit-destination-${activeLink.id}`}>Destination URL</label><input id={`edit-destination-${activeLink.id}`} type="url" value={editDestination} onChange={(event) => setEditDestination(event.target.value)} required maxLength={2048}/><div className="form-actions"><button className="primary-button" type="submit">Save changes</button><button className="copy-button" type="button" onClick={() => setDetailSection("overview")}>Cancel</button></div></form></section>}
+          {detailSection === "settings" && <section className="panel detail-wide"><div className="eyebrow">LINK SETTINGS</div><h2>Update this link</h2><p>The short URL stays the same when you change its name or destination.</p><form className="link-form settings-form" onSubmit={(event) => void saveLink(event, activeLink.id)}><label htmlFor={`edit-name-${activeLink.id}`}>Link name</label><input id={`edit-name-${activeLink.id}`} value={editName} onChange={(event) => setEditName(event.target.value)} required maxLength={80}/><label htmlFor={`edit-destination-${activeLink.id}`}>Destination URL</label><input id={`edit-destination-${activeLink.id}`} type="url" value={editDestination} onChange={(event) => setEditDestination(event.target.value)} required maxLength={2048}/><div className="form-actions"><button className="primary-button" type="submit">Save changes</button><button className="copy-button" type="button" onClick={() => setDetailSection("overview")}>Cancel</button></div></form><form className="link-form settings-form tag-editor" onSubmit={(event) => { event.preventDefault(); void saveTags(activeLink.id); }}><label htmlFor={`edit-tags-${activeLink.id}`}>Tags <span className="optional">COMMA SEPARATED</span></label><input id={`edit-tags-${activeLink.id}`} value={editTags} onChange={(event) => setEditTags(event.target.value)} placeholder="Launch, Social, Q4"/><button className="copy-button" type="submit">Save tags</button></form><div className="archive-control"><div><strong>{activeLink.archivedAt ? "This link is archived" : "Archive this link"}</strong><p>{activeLink.archivedAt ? "It remains reachable and continues redirecting visitors." : "The short URL will keep redirecting after you archive it."}</p></div><button className="copy-button" onClick={() => void manageLink(activeLink.id, activeLink.archivedAt ? "unarchive" : "archive")}>{activeLink.archivedAt ? "Restore link" : "Archive link"}</button></div><div className="form-actions duplicate-control"><button className="copy-button" onClick={() => void manageLink(activeLink.id, "duplicate")}>Duplicate link</button></div></section>}
         </section> : <div className="empty-state"><h1>Link not found</h1><p>This link may have been removed or belongs to another workspace.</p><button className="primary-button" onClick={() => navigate("links")}>Back to links</button></div>)}
         {route.page === "developer" && <section className="developer-page"><div className="page-intro"><div><div className="eyebrow">BUILD WITH REDIRECT HUB</div><h1>Developer access</h1><p className="intro-copy">Manage credentials for your API tools and local MCP setup.</p></div></div><ApiTokenPanel presentation="page" onClose={() => undefined}/></section>}
       </main>

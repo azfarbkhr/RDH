@@ -76,6 +76,9 @@ const clickColumns = db.prepare("PRAGMA table_info(click_events)").all() as Arra
 if (!linkColumns.some((column) => column.name === "owner_id")) {
   db.exec("ALTER TABLE links ADD COLUMN owner_id TEXT REFERENCES users(id) ON DELETE CASCADE");
 }
+if (!linkColumns.some((column) => column.name === "archived_at")) {
+  db.exec("ALTER TABLE links ADD COLUMN archived_at TEXT");
+}
 if (!linkColumns.some((column) => column.name === "modified_at")) {
   db.exec("ALTER TABLE links ADD COLUMN modified_at TEXT NOT NULL DEFAULT ''");
   db.exec("UPDATE links SET modified_at = created_at WHERE modified_at = ''");
@@ -86,7 +89,30 @@ if (!clickColumns.some((column) => column.name === "matched_rule_id")) {
 if (!clickColumns.some((column) => column.name === "country_code")) {
   db.exec("ALTER TABLE click_events ADD COLUMN country_code TEXT");
 }
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_links_id_owner ON links(id, owner_id);
+  CREATE TABLE IF NOT EXISTS tags (
+    id TEXT PRIMARY KEY,
+    owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    normalized_name TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    UNIQUE (id, owner_id),
+    UNIQUE (owner_id, normalized_name)
+  );
+  CREATE INDEX IF NOT EXISTS idx_tags_owner_name ON tags(owner_id, normalized_name);
+  CREATE TABLE IF NOT EXISTS link_tags (
+    link_id TEXT NOT NULL,
+    tag_id TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    PRIMARY KEY (link_id, tag_id),
+    FOREIGN KEY (link_id, owner_id) REFERENCES links(id, owner_id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id, owner_id) REFERENCES tags(id, owner_id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_link_tags_owner_tag ON link_tags(owner_id, tag_id, link_id);
+`);
 db.exec("CREATE INDEX IF NOT EXISTS idx_links_owner_created ON links(owner_id, created_at DESC)");
+db.exec("CREATE INDEX IF NOT EXISTS idx_links_owner_archive_created ON links(owner_id, archived_at, created_at DESC)");
 db.exec("CREATE INDEX IF NOT EXISTS idx_sessions_user_expiry ON sessions(user_id, expires_at)");
 db.exec("CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id, revoked_at)");
 db.exec("CREATE INDEX IF NOT EXISTS idx_click_events_link_time ON click_events(link_id, clicked_at)");
@@ -99,5 +125,7 @@ export interface LinkRecord {
   name: string;
   destination_url: string;
   created_at: string;
+  modified_at: string;
+  archived_at: string | null;
   click_count?: number;
 }

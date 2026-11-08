@@ -188,6 +188,26 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 @media(max-width:560px){.main-content{width:calc(100% - 32px);padding-top:27px}.page-intro h1{font-size:29px}.intro-copy{font-size:14px}.analytics-heading{align-items:flex-start;gap:8px;flex-direction:column}.analytics-heading h2{font-size:18px}.stats-strip>div{padding:14px}.stats-strip>div+div{padding-left:14px}.stats-strip>div>strong{font-size:24px}.stats-strip>div>span{font-size:9px;letter-spacing:.7px}.stats-strip>p{font-size:11px}.insight-grid{grid-template-columns:1fr}.link-card{padding:15px}.link-card-top{gap:8px}.link-description{flex-basis:calc(100% - 50px)}.link-clicks{margin-left:46px;margin-right:auto}.short-link{max-width:calc(100% - 46px);margin-left:46px}.destination{align-items:flex-start;flex-direction:column;gap:4px}.destination>a{width:100%;white-space:normal;overflow-wrap:anywhere}.rule-fields,.simulator-fields{grid-template-columns:1fr 1fr}.simulator-fields .copy-button{grid-column:1/-1}.token-create{grid-template-columns:1fr 1fr}.token-create label:first-child{grid-column:1/-1}.token-create .primary-button{grid-column:1/-1}.auth-panel{padding:26px 22px}}
 @media(max-width:380px){.topbar{padding-left:15px;padding-right:15px}.brand{font-size:16px}.topbar-actions .signout-button{padding:8px 9px;font-size:11px}.workspace-nav{gap:0}.workspace-nav a{padding:8px;font-size:12px}.main-content{width:calc(100% - 28px)}.create-panel{padding:18px 15px}.rule-fields,.simulator-fields{grid-template-columns:1fr}.link-clicks{margin-left:0}.link-card-top .copy-button{padding:7px 9px}}
 @media(prefers-reduced-motion:reduce){html:focus-within{scroll-behavior:auto}.link-card,.workspace-nav a,.primary-button,.copy-button{transition:none}}
+
+.link-filters{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 0 18px;padding:11px 13px;border:1px solid #e5ebe4;border-radius:10px;background:#fff}
+.archive-tabs{display:flex;gap:4px;padding:3px;border-radius:8px;background:#f2f5f1}
+.archive-tabs button{border:0;border-radius:6px;padding:8px 12px;background:transparent;color:#59685e;font-size:11px;font-weight:650;cursor:pointer}
+.archive-tabs button[aria-pressed="true"]{background:#fff;color:#315d3d;box-shadow:0 1px 3px rgb(31 47 35 / 12%)}
+.tag-filter{display:flex;align-items:center;gap:9px;color:#59685e;font-size:11px;font-weight:650}
+.tag-filter select{min-width:150px;height:34px;padding:0 9px;border:1px solid #e1e8e0;border-radius:7px;background:#fff;color:#35433a;font-size:11px}
+.link-card-bottom{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding-top:11px;border-top:1px solid #f0f2ef}
+.tag-chips,.link-actions{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.tag-chips span{padding:5px 8px;border-radius:20px;background:#edf4ee;color:#3c6748;font-size:10px;font-weight:650}
+.no-tags{color:#7c877f;font-size:10px}
+.link-actions{justify-content:flex-end}
+.tag-editor{margin-top:12px;padding-top:17px;border-top:1px solid #edf0eb}
+.tag-editor input{margin-bottom:10px}
+.tag-editor .copy-button{align-self:flex-start}
+.archive-control{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:22px;padding:17px 0;border-top:1px solid #edf0eb;border-bottom:1px solid #edf0eb}
+.archive-control strong{font-size:12px;color:#35433a}
+.archive-control p{margin:5px 0 0;color:#66736a;font-size:11px;line-height:1.5}
+.duplicate-control{justify-content:flex-start;margin-top:13px}
+@media(max-width:560px){.link-filters{align-items:stretch;flex-direction:column}.archive-tabs{justify-content:space-between}.archive-tabs button{flex:1;padding:8px 5px}.tag-filter{justify-content:space-between}.tag-filter select{flex:1;max-width:70%}.link-card-bottom{align-items:flex-start;flex-direction:column}.link-actions{width:100%;justify-content:flex-start}.archive-control{align-items:flex-start;flex-direction:column}}
 .token-load-error{display:flex;align-items:center;gap:10px;margin:0 0 12px}
 .token-load-error .token-error{flex:1;margin:0}
 .token-load-error .copy-button{flex:none}

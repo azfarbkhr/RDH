@@ -3,10 +3,13 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { db, type LinkRecord } from "./db.js";
 import { createLinkSchema, createRuleSchema, updateLinkSchema, visitorSchema } from "./schemas.js";
 import { resolveDestination, type VisitorContext } from "./routing.js";
+import { GeneratedSlugUnavailableError, insertWithGeneratedSlug, isSlugUniqueConflictError } from "./slug.js";
 
 const app = new Hono<{ Variables: { userId: string; tokenScopes: string[]; sessionAuth: boolean } }>();
 const port = Number(process.env.PORT ?? 8787);
@@ -27,6 +30,7 @@ const loginSchema = z.object({
   password: z.string().min(1).max(128),
 });
 const createTokenSchema = z.object({ name: z.string().trim().min(1).max(60), scopes: z.enum(["read", "read,write"]).default("read") });
+const linkTagsSchema = z.object({ tags: z.array(z.string().trim().min(1).max(160)).max(20) });
 
 const ruleOrderSchema = z.object({ direction: z.enum(["up", "down"]) });
 
@@ -203,7 +207,13 @@ app.delete("/api/auth/tokens/:id", (c) => {
   return c.json({ ok: true });
 });
 
+function getLinkTags(linkId: string, ownerId: string) {
+  return db.prepare(`SELECT tags.name FROM tags JOIN link_tags ON link_tags.tag_id = tags.id AND link_tags.owner_id = tags.owner_id
+    WHERE link_tags.link_id = ? AND link_tags.owner_id = ? ORDER BY tags.normalized_name`).all(linkId, ownerId) as Array<{ name: string }>;
+}
+
 function serialize(link: LinkRecord, baseUrl: string) {
+  const tags = link.owner_id ? getLinkTags(link.id, link.owner_id).map((tag) => tag.name) : [];
   return {
     id: link.id,
     slug: link.slug,
@@ -211,16 +221,40 @@ function serialize(link: LinkRecord, baseUrl: string) {
     destinationUrl: link.destination_url,
     shortUrl: `${baseUrl}/l/${encodeURIComponent(link.slug)}`,
     createdAt: link.created_at,
+    archivedAt: link.archived_at ?? null,
+    tags,
+    ...(typeof link.click_count === "number" ? { clickCount: link.click_count } : {}),
   };
 }
 
 app.get("/api/health", (c) => c.json({ status: "ok" }));
 
 app.get("/api/links", (c) => {
+  const ownerId = c.get("userId");
+  const archiveMode = c.req.query("archive") ?? "active";
+  if (!(["active", "archived", "all"] as const).includes(archiveMode as "active" | "archived" | "all")) {
+    return c.json({ error: "Choose active, archived, or all links." }, 400);
+  }
+  const search = c.req.query("search")?.trim().slice(0, 200) ?? "";
+  const tagId = c.req.query("tag")?.trim() ?? "";
+  const archiveClause = archiveMode === "active" ? "links.archived_at IS NULL" : archiveMode === "archived" ? "links.archived_at IS NOT NULL" : "1 = 1";
+  const searchClause = search ? "AND (instr(lower(links.name), lower(?)) > 0 OR instr(lower(links.slug), lower(?)) > 0 OR instr(lower(links.destination_url), lower(?)) > 0)" : "";
+  const tagClause = tagId ? "AND EXISTS (SELECT 1 FROM link_tags WHERE link_tags.link_id = links.id AND link_tags.owner_id = links.owner_id AND link_tags.tag_id = ? AND link_tags.owner_id = ?)" : "";
+  const params: Array<string> = [ownerId];
+  if (search) params.push(search, search, search);
+  if (tagId) params.push(tagId, ownerId);
   const rows = db.prepare(`SELECT links.*, SUM(CASE WHEN click_events.is_bot = 0 THEN 1 ELSE 0 END) AS click_count
     FROM links LEFT JOIN click_events ON click_events.link_id = links.id
-    WHERE links.owner_id = ? GROUP BY links.id ORDER BY links.created_at DESC, links.rowid DESC`).all(c.get("userId")) as unknown as LinkRecord[];
+    WHERE links.owner_id = ? AND ${archiveClause} ${searchClause} ${tagClause}
+    GROUP BY links.id ORDER BY links.created_at DESC, links.rowid DESC`).all(...params) as unknown as LinkRecord[];
   return c.json({ links: rows.map((row) => serialize(row, getPublicBaseUrl(c.req.url))) });
+});
+
+app.get("/api/tags", (c) => {
+  const tags = db.prepare(`SELECT tags.id, tags.name, COUNT(link_tags.link_id) AS linkCount
+    FROM tags LEFT JOIN link_tags ON link_tags.tag_id = tags.id AND link_tags.owner_id = tags.owner_id
+    WHERE tags.owner_id = ? GROUP BY tags.id ORDER BY tags.normalized_name`).all(c.get("userId"));
+  return c.json({ tags });
 });
 
 app.get("/api/analytics", (c) => {
@@ -243,30 +277,40 @@ app.post("/api/links", async (c) => {
   if (!parsed.success) return c.json({ error: "Check the link details and try again.", issues: parsed.error.flatten().fieldErrors }, 400);
 
   const input = parsed.data;
-  const slug = input.slug ?? randomBytes(5).toString("base64url");
-  if (pointsToOwnShortUrl(input.destinationUrl, slug, c.req.url)) {
+  const slug = input.slug ?? "";
+  if (slug && pointsToOwnShortUrl(input.destinationUrl, slug, c.req.url)) {
     return c.json({ error: "A short link cannot redirect to itself." }, 400);
   }
-  if (db.prepare("SELECT 1 FROM links WHERE slug = ?").get(slug)) {
+  if (slug && db.prepare("SELECT 1 FROM links WHERE slug = ?").get(slug)) {
     return c.json({ error: "That short code is already in use." }, 409);
   }
-
+  const createdAt = new Date().toISOString();
   const link: LinkRecord = {
     id: randomUUID(),
     owner_id: c.get("userId"),
     slug,
     name: input.name,
     destination_url: input.destinationUrl,
-    created_at: new Date().toISOString(),
+    created_at: createdAt,
+    modified_at: createdAt,
+    archived_at: null,
   };
-
-  try {
-    db.prepare("INSERT INTO links (id, owner_id, slug, name, destination_url, created_at) VALUES (@id, @owner_id, @slug, @name, @destination_url, @created_at)").run({ ...link });
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("UNIQUE constraint failed")) {
-      return c.json({ error: "That short code is already in use." }, 409);
+  const insertLink = db.prepare("INSERT INTO links (id, owner_id, slug, name, destination_url, created_at, modified_at, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)");
+  if (input.slug) {
+    try { insertLink.run(link.id, link.owner_id, input.slug, link.name, link.destination_url, createdAt, createdAt); }
+    catch (error) {
+      if (isSlugUniqueConflictError(error)) return c.json({ error: "That short code is already in use." }, 409);
+      throw error;
     }
-    throw error;
+    link.slug = input.slug;
+  } else {
+    try {
+      const generated = insertWithGeneratedSlug((candidate) => insertLink.run(link.id, link.owner_id, candidate, link.name, link.destination_url, createdAt, createdAt));
+      link.slug = generated.slug;
+    } catch (error) {
+      if (error instanceof GeneratedSlugUnavailableError) return c.json({ error: error.message }, 503);
+      throw error;
+    }
   }
 
   return c.json({ link: serialize(link, getPublicBaseUrl(c.req.url)) }, 201);
@@ -291,6 +335,96 @@ app.patch("/api/links/:id", async (c) => {
 
   const updated = db.prepare("SELECT * FROM links WHERE id = ? AND owner_id = ?").get(c.req.param("id"), c.get("userId")) as unknown as LinkRecord;
   return c.json({ link: serialize(updated, getPublicBaseUrl(c.req.url)) });
+});
+
+function cleanTagName(value: string) {
+  const name = value.normalize("NFKC").trim();
+  if (!name || Array.from(name).length > 40) return null;
+  return { name, normalizedName: name.toLowerCase() };
+}
+
+app.put("/api/links/:id/tags", async (c) => {
+  const linkId = c.req.param("id");
+  const ownerId = c.get("userId");
+  const link = getOwnedLink(linkId, ownerId);
+  if (!link) return c.json({ error: "Link not found." }, 404);
+  const parsed = linkTagsSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Provide up to 20 tag names, each 1–40 characters." }, 400);
+  const cleaned = parsed.data.tags.map(cleanTagName);
+  if (cleaned.some((tag) => tag === null)) return c.json({ error: "Tag names must contain 1–40 characters after trimming." }, 400);
+  const tags = cleaned as Array<{ name: string; normalizedName: string }>;
+  if (new Set(tags.map((tag) => tag.normalizedName)).size !== tags.length) {
+    return c.json({ error: "Each tag can only be assigned once to a link." }, 400);
+  }
+
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.prepare("DELETE FROM link_tags WHERE link_id = ? AND owner_id = ?").run(linkId, ownerId);
+    const insertTag = db.prepare("INSERT INTO tags (id, owner_id, name, normalized_name) VALUES (?, ?, ?, ?) ON CONFLICT(owner_id, normalized_name) DO NOTHING");
+    const findTag = db.prepare("SELECT id FROM tags WHERE owner_id = ? AND normalized_name = ?");
+    const attachTag = db.prepare("INSERT INTO link_tags (link_id, tag_id, owner_id) VALUES (?, ?, ?)");
+    for (const tag of tags) {
+      insertTag.run(randomUUID(), ownerId, tag.name, tag.normalizedName);
+      const existing = findTag.get(ownerId, tag.normalizedName) as { id: string } | undefined;
+      if (!existing) throw new Error("Tag could not be created.");
+      attachTag.run(linkId, existing.id, ownerId);
+    }
+    db.prepare("DELETE FROM tags WHERE owner_id = ? AND NOT EXISTS (SELECT 1 FROM link_tags WHERE link_tags.tag_id = tags.id)").run(ownerId);
+    db.exec("COMMIT");
+  } catch (error) {
+    if (db.isTransaction) db.exec("ROLLBACK");
+    throw error;
+  }
+  const updated = getOwnedLink(linkId, ownerId)!;
+  return c.json({ link: serialize(updated, getPublicBaseUrl(c.req.url)) });
+});
+
+app.post("/api/links/:id/archive", (c) => {
+  const ownerId = c.get("userId");
+  const linkId = c.req.param("id");
+  const result = db.prepare("UPDATE links SET archived_at = COALESCE(archived_at, ?), modified_at = ? WHERE id = ? AND owner_id = ?")
+    .run(new Date().toISOString(), new Date().toISOString(), linkId, ownerId);
+  if (!result.changes) return c.json({ error: "Link not found." }, 404);
+  return c.json({ link: serialize(getOwnedLink(linkId, ownerId)!, getPublicBaseUrl(c.req.url)) });
+});
+
+app.post("/api/links/:id/unarchive", (c) => {
+  const ownerId = c.get("userId");
+  const linkId = c.req.param("id");
+  const result = db.prepare("UPDATE links SET archived_at = NULL, modified_at = ? WHERE id = ? AND owner_id = ?")
+    .run(new Date().toISOString(), linkId, ownerId);
+  if (!result.changes) return c.json({ error: "Link not found." }, 404);
+  return c.json({ link: serialize(getOwnedLink(linkId, ownerId)!, getPublicBaseUrl(c.req.url)) });
+});
+
+app.post("/api/links/:id/duplicate", (c) => {
+  const ownerId = c.get("userId");
+  const source = getOwnedLink(c.req.param("id"), ownerId);
+  if (!source) return c.json({ error: "Link not found." }, 404);
+  const createdAt = new Date().toISOString();
+  const newLink: Omit<LinkRecord, "slug"> & { slug: string } = {
+    id: randomUUID(), owner_id: ownerId, slug: "", name: source.name,
+    destination_url: source.destination_url, created_at: createdAt,
+    modified_at: createdAt, archived_at: null,
+  };
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const insertLink = db.prepare("INSERT INTO links (id, owner_id, slug, name, destination_url, created_at, modified_at, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)");
+    const generated = insertWithGeneratedSlug((slug) => insertLink.run(newLink.id, ownerId, slug, newLink.name, newLink.destination_url, createdAt, createdAt));
+    newLink.slug = generated.slug;
+    const sourceTags = db.prepare("SELECT tag_id FROM link_tags WHERE link_id = ? AND owner_id = ?").all(source.id, ownerId) as Array<{ tag_id: string }>;
+    const attachTag = db.prepare("INSERT INTO link_tags (link_id, tag_id, owner_id) VALUES (?, ?, ?)");
+    for (const tag of sourceTags) attachTag.run(newLink.id, tag.tag_id, ownerId);
+    const sourceRules = db.prepare("SELECT priority, country_code, device, destination_url FROM redirect_rules WHERE link_id = ? ORDER BY priority, created_at, id").all(source.id) as Array<{ priority: number; country_code: string | null; device: string | null; destination_url: string }>;
+    const insertRule = db.prepare("INSERT INTO redirect_rules (id, link_id, priority, country_code, device, destination_url) VALUES (?, ?, ?, ?, ?, ?)");
+    for (const rule of sourceRules) insertRule.run(randomUUID(), newLink.id, rule.priority, rule.country_code, rule.device, rule.destination_url);
+    db.exec("COMMIT");
+  } catch (error) {
+    if (db.isTransaction) db.exec("ROLLBACK");
+    if (error instanceof GeneratedSlugUnavailableError) return c.json({ error: error.message }, 503);
+    throw error;
+  }
+  return c.json({ link: serialize(getOwnedLink(newLink.id, ownerId)!, getPublicBaseUrl(c.req.url)) }, 201);
 });
 
 function getOwnedLink(linkId: string, ownerId: string) {
@@ -391,8 +525,10 @@ app.get("/l/:slug", (c) => {
   return c.redirect(resolved.destinationUrl, 302);
 });
 
-serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, (info) => {
-  console.log(`Redirect Hub API listening at http://127.0.0.1:${info.port}`);
-});
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, (info) => {
+    console.log(`Redirect Hub API listening at http://127.0.0.1:${info.port}`);
+  });
+}
 
 export { app };
