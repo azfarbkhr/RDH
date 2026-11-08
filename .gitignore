@@ -2,3 +2,9 @@
 __pycache__
 .env
 redirect_hub/db.sqlite3
+
+# Node.js workspaces
+node_modules/
+dist/
+data/
+*.tsbuildinfo

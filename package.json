@@ -1,0 +1,12 @@
+{
+  "name": "redirect-hub",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @redirect-hub/api --filter @redirect-hub/web dev",
+    "build": "pnpm --recursive build",
+    "mcp": "pnpm --filter @redirect-hub/api mcp",
+    "test": "pnpm --filter @redirect-hub/api test"
+  }
+}
