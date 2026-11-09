@@ -1,16 +1,66 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Generate downloadable QR codes for short links | Redirect Hub</title><link rel="stylesheet" href="../../assets/site.css"><script src="../../assets/menu.js" defer></script></head><body><main>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Generate downloadable QR codes for short links | Redirect Hub</title>
+  <link rel="stylesheet" href="../../assets/site.css">
+  <script src="../../assets/menu.js" defer></script>
+</head>
+<body>
+<main>
 <h1>Generate downloadable QR codes for short links</h1>
-<p><strong>Ticket:</strong> T-0004. <strong>Delivery role:</strong> developer. <strong>Relative effort:</strong> S. S = localized addition, M = cross-layer work, L = infrastructure or complex runtime work. These are planning estimates, not commitments.</p>
+<p><strong>Ticket:</strong> T-0004. <strong>Delivery role:</strong> Full-stack developer. <strong>Relative effort:</strong> S. S = localized addition, M = cross-layer work, L = infrastructure or complex runtime work. Estimates are planning aids, not commitments.</p>
 <p>Lifecycle, priority, dependencies, and ticket path are maintained only in <a href="../index.html">the queue</a>, sourced from <a href="../tickets.jsonl">tickets.jsonl</a>.</p>
-<h2>Outcome</h2><p>Offer a QR preview and PNG/SVG downloads generated locally from the canonical public short URL. Keep the first design simple and scannable.</p>
-<h2>Current evidence</h2><p>The current Django model has an owner, target URL, unique short code, and timestamps. The current redirect view selects a single destination. The inspected test module is a placeholder. Proposed behavior above is not implemented by this ticket document.</p>
-<p>Feature inspiration: <a href="https://dub.co/links">Dub Links</a>, inspected 8 November 2026. The scope and effort are Redirect Hub recommendations, not claims about Dub implementation cost. See <a href="../../research/2026-11-08-dub-feature-analysis.html">research and source limits</a> and <a href="../../product/2026-11-08-backlog-decisions.html">owner direction and planning assumptions</a>.</p>
-<h2>Scope and exclusions</h2><p>No logo uploads, image hosting, or QR design editor.</p>
-<h2>Acceptance checks</h2><table><thead><tr><th>ID</th><th>Observable done-check</th></tr></thead><tbody><tr><td>AC01</td><td>Generate codes for the short URL, using configured public base URL rather than an untrusted request host.</td></tr><tr><td>AC02</td><td>Changing the destination leaves an existing QR code usable.</td></tr><tr><td>AC03</td><td>Limit output dimensions and authorize download/preview access to the owner.</td></tr></tbody></table>
-<h2>Research, design, and interfaces</h2><p>Inspect the current models, forms, views, URL configuration, and templates before implementation. Preserve legacy links and account isolation. Use synthetic fixtures. Share service contracts across UI, API, MCP, and routing where applicable.</p>
-<h2>Verification plan and results</h2><table><thead><tr><th>ID</th><th>Procedure and expected result</th><th>Actual result</th></tr></thead><tbody><tr><td>V01 / AC01</td><td>Decode generated PNG fixtures and inspect SVG payload; expected: the exact canonical short URL.</td><td>Not run: this is a planning artifact.</td></tr><tr><td>V02 / AC02</td><td>Generate a code, edit the destination, and follow its decoded URL; expected: the new destination.</td><td>Not run: this is a planning artifact.</td></tr><tr><td>V03 / AC03</td><td>Request excessive dimensions and another user&#x27;s link; expected: bounded validation and denied access.</td><td>Not run: this is a planning artifact.</td></tr></tbody></table>
-<h2>Documentation impact</h2><p>Document how to download and scan a code. Add a sample to the README showcase later.</p>
-<h2>Implementation and review evidence</h2><p>No implementation or application tests have been performed for this ticket. Candidate commit: none. Independent definition-of-ready review is required before delivery. Record exact commands, observed results, limits, changed paths, and independent review evidence here as work occurs.</p>
-<h2>Handoff</h2><p>Coordinator: route this proposal to the Requirements Analyst for remaining implementation decisions, then the Independent Reviewer for readiness. Delivery role: developer. Leave application changes out of this planning assignment.</p>
-</main></body></html>
+
+<h2>Outcome</h2>
+<p>From an authorized link detail page, preview and download a QR code that opens the stable public short URL. The first release provides an accessible in-app preview and PNG/SVG downloads, with no custom styling controls.</p>
+
+<h2>Current evidence</h2>
+<ul>
+  <li><code>apps/api/src/index.ts</code> is Hono/Node. It validates an optional <code>PUBLIC_BASE_URL</code> as an HTTP(S) origin without path, credentials, query, or fragment. <code>getPublicBaseUrl()</code> falls back to the request URL origin when the setting is absent.</li>
+  <li>The API <code>serialize()</code> function builds <code>shortUrl</code> as <code>{baseUrl}/l/{slug}</code>; the authenticated <code>GET /api/links/:id</code> returns only a link in the selected workspace (404 otherwise). <code>apps/web/src/main.tsx</code> already consumes <code>shortUrl</code> on link details.</li>
+  <li><code>apps/web/package.json</code> uses React 19 and has no QR dependency. No QR endpoint or image storage exists. Generating in the browser from authorized link data avoids an image API, database changes, and server-side network requests.</li>
+  <li>Because the API can derive a URL from the incoming request when <code>PUBLIC_BASE_URL</code> is unset, the QR must only be offered for a configured canonical public origin. Proposed small API contract: expose a QR-eligible canonical short URL derived only from <code>configuredPublicBase</code> (null when unset); do not derive QR payload from the request host or from the destination URL.</li>
+</ul>
+<p>Library evidence: the <a href="https://github.com/soldair/node-qrcode#browser-api">node-qrcode browser API documentation</a> describes browser canvas/data-URL output and SVG string output. Recommendation: use <code>qrcode</code> in the web app for client-side rendering/export. This is a package recommendation, not an adopted dependency; verify its current maintenance, license, TypeScript compatibility, and bundle impact during implementation.</p>
+
+<h2>Scope and exclusions</h2>
+<p>Depends on T-0002 (done). Include the authorized link detail screen; QR preview; PNG and SVG downloads; an API-provided canonical QR URL that is null unless <code>PUBLIC_BASE_URL</code> is configured; bounded output; and concise README usage/setup notes. Keep the payload equal to the short URL, never the destination. No extra QR service, persistence, remote image generation, redirect-target fetching, or request-host-derived QR is needed.</p>
+<p>Exclude brand marks, colors/design editor, custom dimensions, tracking parameters, QR analytics, bulk export, landing-page QR, social previews, and deep-link behavior. Do not change short-link redirect semantics. Destination edits keep the short URL and therefore keep the existing QR valid; scanning it resolves to the link's current destination/routing behavior. Changing the slug or public origin creates a different QR payload; regenerate/download a new code after either change.</p>
+
+<h2>Acceptance checks</h2>
+<table><thead><tr><th>ID</th><th>Observable done-check</th></tr></thead><tbody>
+<tr><td>AC01</td><td>An owner or authorized read-only workspace member can open QR preview for a link available in that workspace. A link in another workspace remains unavailable through the existing link-detail API (404), and no separate public QR resource or server file is added.</td></tr>
+<tr><td>AC02</td><td>The API exposes a QR payload URL only when <code>PUBLIC_BASE_URL</code> is configured; it is formed from that validated origin plus the link slug. With the setting absent, the UI explains that the owner must configure the public origin and does not render or download a QR based on request host.</td></tr>
+<tr><td>AC03</td><td>Preview, PNG download, and SVG download all encode the exact canonical short URL; PNG export is a fixed 512×512 pixels with a four-module quiet zone, black modules on white, and no user-controlled size. SVG remains vector/scalable and uses the same quiet-zone and contrast defaults. Inputs over 2,048 characters are rejected with a visible message rather than generating an unbounded symbol.</td></tr>
+<tr><td>AC04</td><td>After changing only the destination, the previously downloaded QR still decodes to the same short URL, and opening that URL reaches the updated redirect destination/routing. Changing slug or configured public origin produces a new QR payload on the next load.</td></tr>
+<tr><td>AC05</td><td>QR preview and download controls have programmatic labels, are keyboard operable with visible focus, and expose the encoded URL as selectable text. On narrow screens the preview and actions fit the content column without horizontal scrolling.</td></tr>
+</tbody></table>
+
+<h2>Research, design, and interfaces</h2>
+<p>Recommended flow: a compact “QR code” panel on link details, with a responsive preview, the canonical URL shown as text, and “Download PNG” / “Download SVG” actions. Generate client-side from the API's explicit QR-eligible URL. The image is derived data; do not store it. The payload is a public short URL, so the QR itself does not expose the destination configuration. Use black-on-white defaults and a quiet zone; do not place logos over the code. If no configured origin exists, show setup guidance and no QR actions.</p>
+<p>Package suggestion: <code>qrcode</code> (node-qrcode) browser API, using its canvas or PNG data-URL path and SVG string path. Set output dimensions, margin, error-correction level, and colors explicitly; validate payload length before calling the encoder. Sanitization: treat encoder output as generated image data, not HTML; construct SVG download as a Blob with <code>image/svg+xml</code> and a deterministic safe filename based on the slug. Do not fetch or validate the redirect destination from the browser or server.</p>
+
+<h2>Verification plan and results</h2>
+<table><thead><tr><th>ID</th><th>Procedure and expected result</th><th>Actual result</th></tr></thead><tbody>
+<tr><td>V01 / AC01–AC02</td><td>With synthetic accounts/workspaces and a synthetic link, request <code>GET /api/links/:id</code> using its authorized session, then using another workspace session. Repeat with <code>PUBLIC_BASE_URL=https://links.example.test</code> and without it. Expected: authorized request returns a QR URL exactly <code>https://links.example.test/l/&lt;slug&gt;</code>; other workspace gets 404; without setting, QR URL is null and UI offers setup guidance even if request Host differs.</td><td>Not run: grooming only; no app/test/service/database actions performed.</td></tr>
+<tr><td>V02 / AC03</td><td>Generate preview, PNG and SVG for synthetic URL <code>https://links.example.test/l/demo-qr</code>. Decode PNG with a QR decoder and parse SVG payload via a QR decoder or render it to a raster for decode. Expected: both decode exactly to the synthetic URL; PNG is 512×512, colors/quiet zone match defaults, SVG is valid vector XML; a 2,049-character payload is rejected with a visible validation message.</td><td>Not run: grooming only; no app/test/service/database actions performed.</td></tr>
+<tr><td>V03 / AC04</td><td>Generate and save a QR for a synthetic link, change only its destination, then decode the saved image and open its short URL against test data. Next change slug or public origin and reload. Expected: saved code still resolves through the same short URL to the updated destination; changed slug/origin changes the generated payload.</td><td>Not run: grooming only; no app/test/service/database actions performed.</td></tr>
+<tr><td>V04 / AC05</td><td>Use keyboard only to reach and activate preview/download controls; inspect focus and accessible names; check at 320 CSS-pixel viewport and desktop width. Expected: all actions reachable/announced, focus visible, URL readable/selectable, no horizontal overflow.</td><td>Not run: grooming only; no app/test/service/browser actions performed.</td></tr>
+<tr><td>V05 / all</td><td>From repository root run <code>npm --workspace apps/api test</code>, <code>npm --workspace apps/api run build</code>, <code>npm --workspace apps/web run build</code>, and <code>git diff --check</code>. Expected: all pass; retain exact outputs and limits in the implementation handoff.</td><td>Not run: grooming only; not applicable before implementation.</td></tr>
+</tbody></table>
+
+<h2>Documentation impact</h2>
+<p>Update <code>readme.MD</code> after implementation to list QR preview/download and explain that <code>PUBLIC_BASE_URL</code> must be configured to enable QR generation. Include the QR usage steps and note that changing a destination preserves the QR while changing the slug or public origin requires a new download. No separate user-guide page is needed for this small workflow.</p>
+
+<h2>Implementation and review evidence</h2>
+<p>This grooming pass did not implement the application feature and did not run implementation tests, builds, services, browser checks, or database operations. Candidate commit: none. Record implementation changes, exact check commands/results, synthetic decode tool/version, limitations, and independent review evidence here before the coordinator considers closure.</p>
+
+<h2>Handoff</h2>
+<p><strong>Prior stalled attempts:</strong> On 9 November 2026, the first Requirements Analyst and one rescue analyst confirmed workspace access but did not deliver the required completed ticket after follow-ups. The rescue analyst sent a source summary and recommended client-side QR generation from owner-scoped data, then said the ticket was being written; the ticket remained on the Django baseline with incomplete checks. The rescue assignment was interrupted after the stall repeated. No implementation or readiness review had started.</p>
+<p><strong>This candidate:</strong> Replaced the Django description with verified Hono/React evidence; bounded the feature to QR preview and PNG/SVG download from an explicit canonical API URL; added five stable acceptance checks and exact verification procedures. Dependency T-0002 is done. T-0013 is blocked but is not a dependency. Open implementation choice: confirm current <code>qrcode</code> package maintenance/license/types/bundle impact before adding it; the API's explicit null-or-canonical QR URL field is part of the proposed contract.</p>
+<p><strong>Recommended next action:</strong> Coordinator routes this groomed candidate for an independent definition-of-ready review. After that review, assign a full-stack developer for implementation. Keep T-0004 in progress until implementation and independent review evidence satisfy every applicable acceptance check.</p>
+</main>
+</body>
+</html>
