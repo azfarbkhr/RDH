@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>T-0003 Implementation Review | Redirect Hub</title>
+  <link rel="stylesheet" href="../assets/site.css">
+  <script src="../assets/menu.js" defer></script>
+</head>
+<body>
+<main>
+  <h1>T-0003 implementation review</h1>
+  <p><strong>Deliverable:</strong> UTM campaign builder and destination preview</p>
+  <p><strong>Reviewer:</strong> Independent Reviewer · <strong>Review date:</strong> 9 November 2026</p>
+  <p><strong>Exact candidate:</strong> <code>7b67c07a98c8d36286b6c95275574fe30cfe83dd</code> (<code>T-0003: add per-link UTM builder and preview</code>)</p>
+  <p><strong>Checkout:</strong> <code>D:\WorkITAAI\RDH</code>, branch <code>main</code>. HEAD matched the candidate. The candidate's implementation paths were unchanged after the commit; unrelated documentation and backlog files remained modified or untracked.</p>
+
+  <h2>Verdict: NEEDS-INFO</h2>
+  <p>No implementation defect was found. AC02 and AC04–AC05 pass the reviewed code and independently rerun checks. AC03 passes from the shared-helper integration, API behavior, and coordinator's recorded browser preview. AC01 remains unverified end-to-end in the React UI: automated coverage exercises authenticated API create/update, while the browser observation only filled the create form and inspected its unsaved preview. It did not submit that form or save an edit through Settings. Resolve this evidence gap before marking T-0003 done.</p>
+
+  <h2>Review procedure</h2>
+  <ul>
+    <li>Confirmed branch, HEAD, and the absence of post-commit changes to candidate implementation files.</li>
+    <li>Inspected the exact candidate's schema, database migration, API handlers, shared URL composer, React create and Settings forms, test coverage, README, architecture and technical pages, and UTM user guide.</li>
+    <li>Ran <code>pnpm --filter @redirect-hub/api test</code>: 2 tests passed, 0 failed. This independently exercised the existing migration suite and the synthetic T-0003 API/helper suite.</li>
+    <li>Ran <code>pnpm --filter @redirect-hub/api build</code>: passed (<code>tsc --noEmit</code>).</li>
+    <li>Ran <code>pnpm --filter @redirect-hub/web build</code>: passed (<code>tsc -b</code> and Vite production build).</li>
+    <li>Read the coordinator's recorded Chrome evidence in the T-0003 ticket. This reviewer could not independently repeat the browser interaction; the child browser inventory was unavailable. I do not attribute that observation to the reviewer.</li>
+  </ul>
+
+  <h2>Acceptance checks</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Review procedure and evidence</th><th>Outcome</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>AC01</td>
+        <td>Inspected create and Settings components in <code>apps/web/src/main.tsx</code>; the fields are mapped to each API property and Settings hydrates from the selected link. Independently reran <code>apps/api/tests/utm-builder.test.ts</code>, which creates and reads all five fields, patches one field while retaining omitted values, clears fields, and checks cross-owner access. However, this does not submit or edit via the React UI. The coordinator's Chrome evidence in T-0003 V03 only inspects an unsaved create preview. Need an isolated browser create/save and Settings edit/save round trip.</td>
+        <td>NEEDS-INFO</td>
+      </tr>
+      <tr>
+        <td>AC02</td>
+        <td>Independently reran <code>pnpm --filter @redirect-hub/api test</code>. The UTM test iterates all five fields, accepts 200 emoji code points, rejects 201 with a field-specific issue, rejects numeric values with a field-specific issue, and checks trimming/interior Unicode. API schemas count code points with <code>Array.from</code>; PATCH accepts null, empty, or whitespace values as clears. Outcome: expected validation and clearing behavior passed.</td>
+        <td>PASS</td>
+      </tr>
+      <tr>
+        <td>AC03</td>
+        <td>Inspected <code>packages/shared/src/utm.ts</code> and verified the React <code>UtmFields</code> component imports that same helper and computes preview from local draft state without issuing a write. The independently rerun API test checks encoded Unicode/spaces, repeated query pairs, case-insensitive UTM replacement, and fragments; it checks simulation output equals live redirect <code>Location</code>. The coordinator recorded a Chrome preview of unsaved synthetic values in T-0003 V03. Browser evidence is coordinator-attributed, not independently repeated here.</td>
+        <td>PASS</td>
+      </tr>
+      <tr>
+        <td>AC04</td>
+        <td>Inspected both simulation and redirect call sites: each resolves the selected destination first, then calls <code>composeDestinationUrl</code> with the same stored link configuration. Independently reran the API test: desktop simulation selects the default URL; mobile simulation selects the rule URL; the rule URL retains its repeated non-UTM keys and fragment; live redirect Location equals simulated output. This check uses a device rule; country-specific matching was not separately exercised.</td>
+        <td>PASS</td>
+      </tr>
+      <tr>
+        <td>AC05</td>
+        <td>Independently reran the live redirect test with forged incoming <code>utm_source</code>, <code>destinationUrl</code>, and repeated visitor parameters. The redirect resolves from stored link/rule data, applies saved UTMs, and excludes the visitor-supplied values from the destination. Test: <code>apps/api/tests/utm-builder.test.ts</code>.</td>
+        <td>PASS</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Additional findings</h2>
+  <ul>
+    <li>The startup migration adds nullable columns for pre-existing link tables, leaving existing links without UTM values. The test suite's migration test passed and preserves legacy records.</li>
+    <li>Duplicate-link handling copies the five UTM settings; the new configuration remains owner-scoped through existing link ownership checks.</li>
+    <li>The shared composer removes all case variants of standard UTM keys, appends one canonical key for each nonempty configured value, and preserves other query pairs and the fragment.</li>
+    <li>Documentation added or updated in the candidate describes the API, behavior, and user workflow. The UTM guide uses the project's shared CSS and menu script.</li>
+    <li>The candidate also includes the current architecture/technical page refresh and the local MCP guide, which keeps the documentation index's links valid; this is broader than T-0003's feature code.</li>
+  </ul>
+
+  <h2>Handoff</h2>
+  <p><strong>Open evidence:</strong> AC01 needs an isolated browser workflow that creates a link with UTM values, confirms saved values in Settings, edits or clears a field, saves, and confirms the persisted preview/value. Use synthetic data and a temporary SQLite database; do not alter the demo account.</p>
+  <p><strong>Who can resolve it:</strong> Coordinator or UI Developer. No code correction is requested by this review. Once the evidence is recorded, send the same exact candidate <code>7b67c07a98c8d36286b6c95275574fe30cfe83dd</code> back for review. Any source change requires a new candidate commit and review.</p>
+  <p><strong>Changed paths:</strong> <code>docs/reviews/2026-11-09-T0003-implementation-review.html</code> only. The reviewer left the candidate and queue metadata unchanged.</p>
+</main>
+</body>
+</html>

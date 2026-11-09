@@ -1,6 +1,6 @@
-{"id": "T-0001", "title": "Redesign the application UI and core workflows", "priority": 1, "status": "new", "depends_on": [], "ticket": "T-0001-app-ui-redesign/ticket.html", "resume_when": null}
-{"id": "T-0002", "title": "Add link names, tags, generated slugs, and archiving", "priority": 2, "status": "new", "depends_on": [], "ticket": "T-0002-link-organization/ticket.html", "resume_when": null}
-{"id": "T-0003", "title": "Add a UTM campaign builder with destination preview", "priority": 3, "status": "new", "depends_on": ["T-0002"], "ticket": "T-0003-utm-builder/ticket.html", "resume_when": null}
+{"id": "T-0001", "title": "Redesign the application UI and core workflows", "priority": 1, "status": "deferred", "depends_on": [], "ticket": "T-0001-app-ui-redesign/ticket.html", "resume_when": "Owner explicitly asks to resume T-0001 accessibility work"}
+{"id":"T-0002","title":"Add link names, tags, generated slugs, and archiving","priority":2,"status":"done","depends_on":[],"ticket":"T-0002-link-organization/ticket.html","resume_when":null}
+{"id":"T-0003","title":"Add a UTM campaign builder with destination preview","priority":3,"status":"review","depends_on":["T-0002"],"ticket":"T-0003-utm-builder/ticket.html","resume_when":null}
 {"id": "T-0004", "title": "Generate downloadable QR codes for short links", "priority": 4, "status": "new", "depends_on": ["T-0002"], "ticket": "T-0004-qr-downloads/ticket.html", "resume_when": null}
 {"id": "T-0005", "title": "Add pause controls, expiration, and expired destinations", "priority": 5, "status": "new", "depends_on": ["T-0002"], "ticket": "T-0005-link-lifecycle/ticket.html", "resume_when": null}
 {"id": "T-0006", "title": "Add password-protected links", "priority": 6, "status": "new", "depends_on": ["T-0005"], "ticket": "T-0006-password-protection/ticket.html", "resume_when": null}
