@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>T-0003 Implementation Follow-up Review | Redirect Hub</title>
+  <link rel="stylesheet" href="../assets/site.css">
+  <script src="../assets/menu.js" defer></script>
+</head>
+<body>
+<main>
+  <h1>T-0003 implementation follow-up review</h1>
+  <p><strong>Deliverable:</strong> UTM campaign builder and destination preview</p>
+  <p><strong>Reviewer:</strong> Independent Reviewer · <strong>Review date:</strong> 9 November 2026</p>
+  <p><strong>Exact source candidate:</strong> <code>7b67c07a98c8d36286b6c95275574fe30cfe83dd</code> (<code>T-0003: add per-link UTM builder and preview</code>)</p>
+  <p><strong>Supplemental evidence commit:</strong> <code>614cbb1246d6d4eea3dde73879e53d9cacdfc0f4</code> (records V06 and this follow-up review context; not a source change)</p>
+  <p><strong>Checkout:</strong> <code>D:\WorkITAAI\RDH</code>, branch <code>main</code>, HEAD <code>614cbb1246d6d4eea3dde73879e53d9cacdfc0f4</code>. I confirmed the scoped API, test, web, and shared UTM implementation paths have no changes between the source candidate and HEAD. Other working-tree documentation changes are outside this review.</p>
+
+  <h2>Verdict: PASS</h2>
+  <p>V06 closes the only gap recorded in the initial review: the missing React create/save and Settings edit/save/reload round trip for AC01. It reports that the five values were created through the React form, edited and cleared through Settings, and still appeared correctly with the matching preview after a full reload. AC01–AC05 now have evidence for the exact unchanged source candidate. No material implementation defect was found. The browser procedure is coordinator-attributed; I did not independently repeat it.</p>
+
+  <h2>Follow-up procedure</h2>
+  <ul>
+    <li>Confirmed branch and HEAD, and used <code>git diff --quiet 7b67c07a98c8d36286b6c95275574fe30cfe83dd HEAD --</code> on the scoped API, test, web, and shared UTM source paths; no source differences were found.</li>
+    <li>Reviewed the exact ticket acceptance criteria and V01–V06 evidence in <a href="../tickets/T-0003-utm-builder/ticket.html">T-0003 ticket</a>, along with the initial <a href="2026-11-09-T0003-implementation-review.html">implementation review</a>.</li>
+    <li>Inspected the candidate versions of the shared composer, API test, API simulation/redirect call sites, and React UTM create/Settings preview wiring. This confirmed the code paths cited in the previous review are still the candidate under review.</li>
+    <li>Relied on the first independent review for its candidate-specific API test/build runs and detailed AC02–AC05 execution. I did not rerun those commands because the implementation files are unchanged from that review.</li>
+    <li>Read V06 as coordinator-recorded browser evidence. The reviewer's browser inventory was unavailable, so the Chrome workflow was not independently repeated and is not represented as reviewer-run verification.</li>
+  </ul>
+
+  <h2>Acceptance checks</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Procedure and evidence</th><th>Observed result and attribution</th><th>Outcome</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>AC01</td>
+        <td>Prior reviewer inspected candidate React create and Settings forms and independently ran <code>apps/api/tests/utm-builder.test.ts</code> for authenticated create/read, omitted-field PATCH retention, clear semantics, and owner isolation. Follow-up evidence is T-0003 V06, executed with isolated services, origin, account, and temporary SQLite: create via React with five values, save, edit in Settings (clear Source, change Medium/Campaign), save, reload, reopen Settings, and compare values and preview.</td>
+        <td>API behavior passed in the first independent review. Coordinator-attributed V06 reports successful create state and exact preview; save confirmation after edit; then, after full reload, Source remained empty and Medium, Campaign, Content and preview reflected saved values. The temporary review data was removed, and the demo remained at 0 links. This resolves the earlier missing UI round-trip evidence; browser work was not repeated by this reviewer.</td>
+        <td>PASS</td>
+      </tr>
+      <tr>
+        <td>AC02</td>
+        <td>Evidence: prior independent review of candidate schema and <code>apps/api/tests/utm-builder.test.ts</code>; reviewer ran <code>pnpm --filter @redirect-hub/api test</code>.</td>
+        <td>First reviewer reports all five fields accept 200 Unicode code points, reject 201 and non-string inputs with field-specific errors, trim outer whitespace, preserve interior Unicode/spaces, and clear blank values. Test run: 2 passed, 0 failed.</td>
+        <td>PASS</td>
+      </tr>
+      <tr>
+        <td>AC03</td>
+        <td>Evidence: prior reviewer inspected <code>packages/shared/src/utm.ts</code> and React create/Settings forms in <code>apps/web/src/main.tsx</code>; ran the candidate API test; V03/V06 in the T-0003 ticket record browser previews.</td>
+        <td>The candidate UI calls the shared composer for draft previews; the API test checks encoded values, repeated non-UTM pairs, case-insensitive UTM replacement, fragments, and equality between simulation and redirect. V06 supplies saved create/edit/reload preview evidence, attributed to the Coordinator.</td>
+        <td>PASS</td>
+      </tr>
+      <tr>
+        <td>AC04</td>
+        <td>Evidence: prior reviewer inspected the candidate resolver/composer call sites in <code>apps/api/src/index.ts</code> and independently ran <code>apps/api/tests/utm-builder.test.ts</code>.</td>
+        <td>Simulation and live redirect both resolve the destination first and compose the same per-link UTM configuration afterward. Test evidence covers the default and a matching mobile rule destination, repeated non-UTM query values, fragments, and equality of simulation output and live <code>Location</code>. Country-rule selection was not separately exercised; the acceptance criterion allows a selected rule destination and does not require testing every rule kind.</td>
+        <td>PASS</td>
+      </tr>
+      <tr>
+        <td>AC05</td>
+        <td>Evidence: prior reviewer independently ran the candidate live redirect test with forged visitor query values.</td>
+        <td>The tested request included attacker <code>utm_source</code>, <code>destinationUrl</code>, and repeated visitor parameters. The redirect used stored routing/configuration, and the resulting destination omitted visitor-supplied values.</td>
+        <td>PASS</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Verification provenance and limits</h2>
+  <p>The initial independent review records successful runs of <code>pnpm --filter @redirect-hub/api test</code> (2 passed), <code>pnpm --filter @redirect-hub/api build</code>, and <code>pnpm --filter @redirect-hub/web build</code> against source candidate <code>7b67c07a98c8d36286b6c95275574fe30cfe83dd</code>. Those results are attributed to that reviewer, not repeated by this follow-up reviewer. The ticket's V06 describes the separate Chrome workflow at <code>http://localhost:5174</code>, isolated API port <code>8789</code>, and temporary database; that result is attributed to the Coordinator. I verified that the reviewed source paths are unchanged between the two named commits.</p>
+  <p>Limits: browser observations are documented rather than independently replayed in this follow-up. AC04 uses a device-based rule; country-specific matching was not separately exercised. Neither limit leaves an applicable acceptance check without evidence.</p>
+
+  <h2>Handoff</h2>
+  <p><strong>Recommended outcome:</strong> PASS T-0003 for exact source candidate <code>7b67c07a98c8d36286b6c95275574fe30cfe83dd</code>, with supplemental evidence at <code>614cbb1246d6d4eea3dde73879e53d9cacdfc0f4</code>. The Coordinator can align the ticket lifecycle in the queue and proceed with dependent work, subject to the coordinator's normal independent-review and commit rules.</p>
+  <p><strong>Changed path:</strong> <code>docs/reviews/2026-11-09-T0003-implementation-followup-review.html</code> only. No source code or queue metadata was changed. The report is left unstaged.</p>
+</main>
+</body>
+</html>
