@@ -22,7 +22,7 @@ pnpm dev</code></pre>
 <h2>Current API</h2>
 <ul>
 <li><code>GET /api/health</code> returns a service health response.</li>
-<li><code>GET /api/auth/session</code>, <code>POST /api/auth/register</code>, <code>POST /api/auth/login</code>, and <code>POST /api/auth/logout</code> report or change the owner session. Registration creates the first account only.</li>
+<li><code>GET /api/auth/session</code>, <code>POST /api/auth/register</code>, <code>POST /api/auth/login</code>, and <code>POST /api/auth/logout</code> report or change the owner session. Registration creates an independent owner account and starts its session; only the first account adopts legacy links with no owner. Later accounts do not claim those links.</li>
 <li><code>GET /api/auth/tokens</code>, <code>POST /api/auth/tokens</code>, and <code>DELETE /api/auth/tokens/:id</code> manage an owner's hashed read or read/write bearer tokens. A token value is returned only once at creation.</li>
 <li><code>GET /api/links</code> lists links owned by the signed-in account.</li>
 <li><code>POST /api/links</code> creates a link owned by the signed-in account with a name, HTTP(S) destination, optional custom slug, and optional UTM source, medium, campaign, term, and content values.</li>
@@ -35,7 +35,7 @@ pnpm dev</code></pre>
 </ul>
 <p>Build with <code>pnpm build</code>. The frontend and API build separately inside <code>apps/web/</code> and <code>apps/api/</code>.</p>
 <h2>Prototype boundary</h2>
-<p>This vertical slice has one owner account per instance. Sessions are opaque random tokens whose hashes are stored in SQLite; the browser cookie is HTTP-only and SameSite Lax. Passwords use Node.js scrypt. There is no account invitation or password recovery yet. The API binds to loopback. Do not expose it to a network before deployment security, account recovery, and operational setup are complete.</p>
+<p>Self-service registration can create multiple independent owner accounts on an instance. Each account sees only its own links, rules, tags, tokens, and analytics; registration does not provide workspace sharing or invitations. Sessions are opaque random tokens whose hashes are stored in SQLite; the browser cookie is HTTP-only and SameSite Lax. Passwords use Node.js scrypt. There is no account invitation or password recovery yet. Registration has no rate limit. The API binds to loopback. This remains a local/self-hosted prototype and is not prepared for public deployment; do not expose it to a network before deployment security and operational setup are complete.</p>
 <p>Country is only derived from <code>CF-IPCountry</code> when <code>COUNTRY_HEADER_PROVIDER=cloudflare</code>; enable this only behind a trusted proxy configured to replace the header. Device classification is coarse. Referrer hostname is recorded but is not currently returned as an analytics breakdown. Token expiry, automatic rotation, retention controls, remote MCP transport, date filters, and CSV export have not been implemented.</p>
 <p>The repository also contains the earlier Django prototype in <code>redirect_hub/</code>. The new Node/React workspace lives in <code>apps/</code>; migration or removal of the Django source has not been done.</p>
 <p>Product direction and delivery proposals are in the <a href="../product/2026-11-08-backlog-decisions.html">product decisions</a> and <a href="../tickets/index.html">ticket queue</a>.</p>

@@ -23,11 +23,11 @@ if (configuredPublicBase && (configuredPublicBase.protocol !== "http:" && config
 }
 
 const registerSchema = z.object({
-  email: z.email().trim().max(254),
+  email: z.string().trim().max(254).pipe(z.email()),
   password: z.string().min(12).max(128),
 });
 const loginSchema = z.object({
-  email: z.email().trim().max(254),
+  email: z.string().trim().max(254).pipe(z.email()),
   password: z.string().min(1).max(128),
 });
 const createTokenSchema = z.object({ name: z.string().trim().min(1).max(60), scopes: z.enum(["read", "read,write"]).default("read") });
@@ -141,13 +141,12 @@ app.post("/api/auth/register", async (c) => {
   const passwordHash = await hashPassword(input.data.password, salt);
   db.exec("BEGIN IMMEDIATE");
   try {
-    if (db.prepare("SELECT 1 FROM users LIMIT 1").get()) {
-      db.exec("ROLLBACK");
-      return c.json({ error: "This instance already has an account. Sign in instead." }, 409);
-    }
+    const hasExistingAccounts = Boolean(db.prepare("SELECT 1 FROM users LIMIT 1").get());
     db.prepare("INSERT INTO users (id, email, password_salt, password_hash) VALUES (?, ?, ?, ?)")
       .run(userId, input.data.email.trim().toLowerCase(), salt, passwordHash.toString("hex"));
-    db.prepare("UPDATE links SET owner_id = ? WHERE owner_id IS NULL").run(userId);
+    if (!hasExistingAccounts) {
+      db.prepare("UPDATE links SET owner_id = ? WHERE owner_id IS NULL").run(userId);
+    }
     db.exec("COMMIT");
   } catch (error) {
     if (db.isTransaction) db.exec("ROLLBACK");

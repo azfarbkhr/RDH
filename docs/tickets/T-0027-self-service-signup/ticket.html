@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Enable self-service account sign-up | Redirect Hub</title>
+  <link rel="stylesheet" href="../../assets/site.css">
+  <script src="../../assets/menu.js" defer></script>
+</head>
+<body>
+<main>
+  <h1>Enable self-service account sign-up</h1>
+
+  <h2>Outcome</h2>
+  <p>Let visitors create their own account from the sign-in screen, so an initialized instance is not limited to its first account. Each account remains a separate owner with its own links, routing rules, tokens, and analytics.</p>
+
+  <h2>Current evidence</h2>
+  <ul>
+    <li>Verified in <code>apps/api/src/index.ts</code>: <code>POST /api/auth/register</code> rejects a registration once any user exists (409). It validates email/password, hashes passwords with scrypt, starts a session on success, and assigns every link with a null owner to the registering account.</li>
+    <li>Verified in <code>apps/web/src/main.tsx</code>: when configured, <code>AuthPanel</code> defaults to sign-in. It has no sign-up toggle and displays “This instance is private. Ask its owner for an account.” Registration is only selected automatically when no account exists.</li>
+    <li>Verified in <code>apps/api/src/index.ts</code>: authenticated link, rule, token, tag, and analytics operations use the current session/token's user ID. Link-by-ID lookups include both link ID and owner ID. This supplies existing account isolation that must remain true.</li>
+    <li>Verified in <code>README.md</code> and <code>docs/technical/index.html</code>: both state that only the first account can register; the technical page describes a single-owner instance. Those claims become stale if this ticket ships.</li>
+  </ul>
+  <p><strong>Inference:</strong> Self-signup creates a standalone owner account. It does not join an existing account's workspace; workspace membership is a separate invitation feature.</p>
+
+  <h2>Scope and exclusions</h2>
+  <ul>
+    <li>Allow a new, unique email/password account to register whether or not other accounts already exist.</li>
+    <li>Add visible, keyboard-operable Sign up and Sign in mode controls to the existing authentication panel; remove the exact private-instance message and describe the account/workspace accurately.</li>
+    <li>Retain first-account bootstrap behavior for any legacy links whose <code>owner_id</code> is null. Later registrations must not claim unowned links or any records already owned by another account. Determine first-account status within the registration transaction to avoid concurrent first registrations both adopting data.</li>
+    <li>New accounts own an isolated workspace. Do not add sharing, roles, invitations, email verification, password recovery, two-factor auth, or account administration; these are separate proposals.</li>
+    <li>Do not claim the instance is safe for public deployment. Registration throttling is outside this ticket; document the current deployment boundary and leave rate limiting as a follow-up.</li>
+  </ul>
+  <p><strong>Delivery owner:</strong> Developer. <strong>Dependencies:</strong> None.</p>
+
+  <h2>Acceptance checks</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Observable done-check</th></tr></thead>
+    <tbody>
+      <tr><td>AC01</td><td>On a configured instance's sign-in screen, a visible Sign up control opens the registration form; the form provides a Sign in control to return. Both controls work by keyboard. The rendered UI and source no longer contain “This instance is private. Ask its owner for an account.”</td></tr>
+      <tr><td>AC02</td><td>A valid new email with a password meeting the existing 12–128 character policy registers even when another account exists, returns 201, and establishes an HTTP-only session for the new account. The session endpoint identifies that account and reports <code>configured: true</code>. Malformed/weak input returns 400; duplicate email returns 409; neither failure creates a user or session.</td></tr>
+      <tr><td>AC03</td><td>In an isolated fixture containing legacy null-owner links but no users, the first successful signup adopts those legacy links as before. In an initialized fixture, later successful signups do not adopt null-owner legacy links. With account A owning a link, rule, tag, API token, and click history, account B's list, tags, analytics, and token list contain none of A's records; attempts to read or mutate A's link/rule by ID return the existing not-found response. A can still use its own data.</td></tr>
+      <tr><td>AC04</td><td>Existing-account login and logout still work with multiple accounts present. After logout, the session endpoint returns no user; signing in as A and then B in separate cookie jars returns the correct identity and never exchanges their data.</td></tr>
+      <tr><td>AC05</td><td>README quick-start and technical authentication documentation describe self-service signup, independent owner-scoped accounts, and the current no-public-deployment boundary. Neither doc says registration closes after the first account or that the instance is single-owner.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Research, design, and interfaces</h2>
+  <p>Use the existing <code>POST /api/auth/register</code> contract, email normalization, scrypt hash, and session cookie. Within <code>BEGIN IMMEDIATE</code>, check whether any user exists, insert the account, and only associate null-owner legacy links if the database had no users before this registration; do not move that migration outside the transaction. Map duplicate-email uniqueness conflicts to the current non-sensitive 409 response. Preserve the existing user ID on every authenticated query. In the React panel, make the two modes explicit and keep the twelve-character minimum aligned with API validation. Do not invent new authorization roles: each successful signup is an independent owner.</p>
+
+  <h2>Verification plan and results</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Procedure</th><th>Expected result / actual evidence</th></tr></thead>
+    <tbody>
+      <tr><td>V01 / AC02–AC04</td><td>Add API tests using a temporary SQLite database and synthetic accounts. Exercise first registration against a legacy null-owner link, second registration on the same initialized database, malformed password/email, duplicate email with case/whitespace normalization, registration response/session, login, and logout.</td><td>Expect first registration to preserve bootstrap adoption; later registration to create a session without adopting data; invalid/duplicate requests to leave user/session counts unchanged; correct identity and configured state on successful sessions.</td></tr>
+      <tr><td>V02 / AC03</td><td>Using separate cookie jars, have A create a link, routing rule, tag, API token, and click event; register B; compare B's links, tags, analytics, and tokens; request A's link/rule identifiers as B; then verify A's records remain available to A.</td><td>Expect owner-scoped empty results for B, 404 for cross-owner resource IDs, no mutation or disclosure, and unchanged A-owned records.</td></tr>
+      <tr><td>V03 / AC01</td><td>Start the web and API with the test database; inspect the configured sign-in screen and sign-up screen in Chrome at desktop and narrow/mobile widths. Use keyboard navigation between mode controls and check focused state, labels, validation, and returned success/session state.</td><td>Expect both modes to be discoverable and operable, the private-instance sentence absent, and a successful signup to enter the new account's empty workspace. Record viewport sizes and environment.</td></tr>
+      <tr><td>V04 / AC05</td><td>Run <code>pnpm --filter @redirect-hub/api test</code>, <code>pnpm --filter @redirect-hub/api build</code>, <code>pnpm --filter @redirect-hub/web build</code>, and <code>git diff --check</code>; inspect README and technical doc claims.</td><td>Expect all commands to pass and docs to match the shipped behavior; record exact results and any limitation.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Documentation impact</h2>
+  <p>Update <code>README.md</code> local setup and current scope, and <code>docs/technical/index.html</code> auth endpoint/prototype-boundary descriptions. Do not describe registration as an owner invitation or imply shared workspaces. Update this ticket with exact verification evidence and the independent review link after implementation.</p>
+
+  <h2>Implementation and review evidence</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Developer evidence</th><th>Result and limit</th></tr></thead>
+    <tbody>
+      <tr><td>AC01</td><td>Updated <code>apps/web/src/main.tsx</code> with visible Sign up / Sign in buttons, mode-specific headings and copy, and no private-instance message; added <code>.auth-mode-switch</code> styling in <code>apps/web/src/styles.css</code>. Chrome inspection confirmed the registration and sign-in modes render at desktop size, and Enter toggles between the two focused mode controls. A second Chrome inspection of the running create screen confirmed the short-code prefix, text field, and trailing arrow align on one centered line after resetting inherited field spacing.</td><td>Source/build and desktop visual/keyboard evidence pass. An earlier attempt using a temporary DB at <code>%TEMP%\rdh-t0027-ui-signup.sqlite</code>, API port 18787, and Vite port 5179 returned <code>net::ERR_CONNECTION_REFUSED</code>; the running app was subsequently inspected in Chrome. Narrow/mobile rendering was not checked.</td></tr>
+      <tr><td>AC02</td><td><code>pnpm --filter @redirect-hub/api test</code>; added <code>apps/api/tests/self-service-signup.test.ts</code> for successful registration/session, invalid email/password, normalized duplicate email, login/logout, and separate identities.</td><td>Pass: all 3 API test files passed (3 tests, 0 failures). Valid registration returns 201 with an HTTP-only cookie and configured session. Invalid requests return 400, duplicate returns 409, and failures create no user/session. Test exposed email trim ordering; registration and login schemas now trim before email validation.</td></tr>
+      <tr><td>AC03</td><td>Same isolated API test checks first signup adopts a null-owner legacy link; second signup leaves a later null-owner link untouched; account B sees empty links/tags/analytics/tokens; link patch and rule deletion by B return 404; account A retains its link, click history, and token ownership.</td><td>Pass under temporary SQLite. Account existence is checked and legacy adoption is conditional inside <code>BEGIN IMMEDIATE</code>. Existing owner-scoped API queries are exercised through separate session cookies.</td></tr>
+      <tr><td>AC04</td><td>Same isolated API test logs out account A, verifies its session endpoint returns no user, then logs in A and B in separate cookie jars and checks each session identity.</td><td>Pass.</td></tr>
+      <tr><td>AC05 / V04</td><td>Updated <code>readme.MD</code> quick-start/current scope and <code>docs/technical/index.html</code> API/prototype boundary. Commands run: <code>pnpm --filter @redirect-hub/api test</code>; <code>pnpm --filter @redirect-hub/api build</code>; <code>pnpm --filter @redirect-hub/web build</code>; <code>git diff --check</code>.</td><td>All commands passed. API suite: 3 tests passed. Both builds succeeded. <code>git diff --check</code> passed; Git emitted only LF-to-CRLF working-copy notices. Docs describe independent accounts, continued signup, first-account-only adoption of legacy null-owner links, and the public deployment boundary; rate limiting remains absent.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Handoff</h2>
+  <p><strong>Open product decisions:</strong> None. The owner explicitly asked for self-service signup and removal of the private-instance message. The standalone account boundary follows the existing owner-ID model; membership invitations remain separate.</p>
+  <p><strong>Security limitation:</strong> There is no registration rate limit in the current stack. This ticket preserves the existing local/self-hosted prototype boundary; it does not authorize public deployment or claim abuse resistance. A rate-limit proposal can be groomed separately if deployment work requires it.</p>
+  <p><strong>Recommended next action:</strong> Coordinator reviews the unstaged handoff, prepares the exact candidate, and assigns an independent implementation reviewer. The reviewer should capture AC01 desktop/mobile and keyboard evidence if browser access is available; this handoff does not claim reviewer evidence or authorize public deployment.</p>
+</main>
+</body>
+</html>

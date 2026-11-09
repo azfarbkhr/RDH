@@ -4,7 +4,7 @@
 
 Build a self-hosted link redirection service where one short URL can send visitors to different destinations based on simple country and device rules. Keep the routing easy to inspect, preview, and understand, with useful click analytics and a local MCP interface for link management.
 
-The repository contains an early working Node.js, Hono, and React prototype alongside its project tickets and documentation. It supports a private, single-owner workspace, editable short links, ordered country/device rules, a visitor simulator, HTTP 302 redirects, and bot-filtered click totals with available country and rule-match breakdowns. This is a functional prototype; it has not yet been prepared for public deployment.
+The repository contains an early working Node.js, Hono, and React prototype alongside its project tickets and documentation. It supports self-service sign-up with separate owner-scoped accounts, editable short links, ordered country/device rules, a visitor simulator, HTTP 302 redirects, and bot-filtered click totals with available country and rule-match breakdowns. This is a functional prototype; it has not yet been prepared for public deployment.
 
 ## Try the local prototype
 
@@ -15,11 +15,11 @@ pnpm install
 pnpm dev
 ```
 
-Open [http://127.0.0.1:5173](http://127.0.0.1:5173). On a fresh database, create the instance's owner account with a valid email and a password of at least 12 characters. Create a named link with an HTTP(S) destination. Optional UTM source, medium, campaign, term, and content fields show the composed destination preview as you type; you can change or clear them later in the link's **Settings**. Open **Routing** to add ordered conditions or preview a visitor. Use the short URL shown in the workspace to redirect.
+Open [http://127.0.0.1:5173](http://127.0.0.1:5173). Choose **Sign up** to create an independent account with a valid email and a password of at least 12 characters. Each account has its own links, routing rules, tokens, tags, and analytics; sign-up does not join another account or share its workspace. Create a named link with an HTTP(S) destination. Optional UTM source, medium, campaign, term, and content fields show the composed destination preview as you type; you can change or clear them later in the link's **Settings**. Open **Routing** to add ordered conditions or preview a visitor. Use the short URL shown in the workspace to redirect.
 
 On **Links**, search by name, short code, or destination, then narrow the list by tag or status. Link settings let you assign comma-separated tags, archive or restore a link, and duplicate its configuration. A duplicate gets a new short code and copies its tags and routing rules without copying click history. Archiving only hides a link from the active list; its short URL continues redirecting to the configured destination.
 
-The first account owns the instance; registration closes after it is created. The development API and Vite server bind to loopback. The SQLite database is created at `data/redirect-hub.sqlite`. Set `DATABASE_PATH` to choose a different database path or `PORT` to change the Hono port. Behind a reverse proxy, set `PUBLIC_BASE_URL` to the public origin and route `/api` and `/l` to Hono so generated short URLs and self-redirect checks use the same host.
+Self-service registration remains available after the first account is created. Only the first account adopts legacy links that have no owner; later accounts start with an empty workspace. The development API and Vite server bind to loopback. The SQLite database is created at `data/redirect-hub.sqlite`. Set `DATABASE_PATH` to choose a different database path or `PORT` to change the Hono port. Behind a reverse proxy, set `PUBLIC_BASE_URL` to the public origin and route `/api` and `/l` to Hono so generated short URLs and self-redirect checks use the same host.
 
 Country is unknown by default. To use country rules in a deployment, set `COUNTRY_HEADER_PROVIDER=cloudflare` only behind a trusted Cloudflare proxy configured to overwrite `CF-IPCountry`. Do not accept this header from arbitrary clients. Device class is inferred from the user-agent; raw IP addresses and full user-agent strings are not stored. Click analytics exclude requests identified as bots.
 
