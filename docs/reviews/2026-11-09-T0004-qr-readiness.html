@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-0004 QR definition-of-ready review | Redirect Hub</title>
+<link rel="stylesheet" href="../assets/site.css">
+<script src="../assets/menu.js" defer></script>
+</head>
+<body><main>
+<h1>T-0004 QR definition-of-ready review</h1>
+<p><strong>Verdict: FAIL.</strong> The QR feature is bounded and technically feasible, but the candidate treats uncommitted workspace behavior as its existing baseline and leaves part of AC01 unverified. Correct these requirements before implementation dispatch. This verdict covers requirements readiness, not application functionality or ticket closure.</p>
+<p><strong>Candidate:</strong> <code>8448c1eba5de684b5c566c4fb07153ebf9d12eb4</code>, <a href="../tickets/T-0004-qr-downloads/ticket.html">T-0004 ticket</a>. Independently reviewed by the rescue Independent Reviewer on 9 November 2026 in <code>D:\WorkITAAI\RDH</code>, branch <code>main</code>, Windows PowerShell. HEAD matched the assigned commit. The assigned report was absent at first read, rather than containing the expected stalled marker. The initial in-scope write succeeded. Unrelated tracked and untracked changes were present and preserved.</p>
+
+<h2>Two bounded corrections are required</h2>
+<ol>
+<li><strong>F01 — distinguish the candidate baseline from pending workspace work.</strong> The ticket's Current evidence says an authenticated <code>GET /api/links/:id</code> already selects the workspace. At the exact candidate, the API has owner-scoped list/read operations and <code>getOwnedLink(linkId, ownerId)</code>, no standalone link-detail GET route, and no workspace-role middleware. The candidate README explicitly says sign-up does not share another account's workspace. The dirty working-tree API does contain the asserted detail route and workspace roles. Those changes are not evidence of the reviewed commit. AC01 requires read-only members, yet the only declared dependency is T-0002. The candidate queue has no T-0025 record.</li>
+<li><strong>F02 — V01 does not exercise the read-only member required by AC01.</strong> V01 requests the link using “its authorized session” and another workspace session. It neither names an owner and a read-only member as separate positive cases nor explicitly opens the QR preview as the member. The procedure can pass using only the owner while member controls are hidden or disabled.</li>
+</ol>
+<p><strong>Correction owner:</strong> Requirements Analyst revises the ticket to identify committed owner-only behavior accurately, name the pending workspace/invitation prerequisite (or explicitly scope its implementation), and extend V01 to check owner and authorized read-only member preview/download access separately, plus a non-member negative case. The coordinator alone aligns queue dependencies with the selected prerequisite and submits a new exact candidate. Repository evidence supports the shared-member intent; no new Product Owner decision is needed for these corrections.</p>
+
+<h2>Readiness checklist</h2>
+<table><thead><tr><th>ID</th><th>Procedure and evidence</th><th>Observed result</th><th>Outcome</th></tr></thead><tbody>
+<tr><td>R01</td><td>Compared outcome, delivery role, scope and exclusions in the candidate ticket with its queue row.</td><td>Full-stack developer, browser preview, PNG/SVG export, no persistence or remote QR service, and unchanged redirect semantics are concrete. T-0002 is done in both candidate and current queue. The shared-member prerequisite is missing from the declared dependency boundary; see F01.</td><td>FAIL</td></tr>
+<tr><td>R02</td><td>Inspected candidate API origin validation, <code>getPublicBaseUrl()</code>, and <code>serialize()</code>; compared current working-tree counterparts.</td><td>HTTP(S)-origin validation and request-origin fallback are verified. Serializer uses <code>baseUrl + /l/ + encodeURIComponent(slug)</code>. Explicit null-or-canonical QR URL is correctly proposed as new work and avoids encoding a request-host URL. Use the normalized configured origin and existing slug encoding when implementing.</td><td>PASS</td></tr>
+<tr><td>R03</td><td>Compared candidate API route inventory and owner scoping with dirty API workspace middleware/detail route, plus candidate README.</td><td>Ticket's assertion of existing workspace detail access is not true for the exact candidate. Source comparison, not a runtime permission test; see F01.</td><td>FAIL</td></tr>
+<tr><td>R04</td><td>Read primary <a href="https://github.com/soldair/node-qrcode#browser-api">node-qrcode documentation</a> and <a href="https://raw.githubusercontent.com/soldair/node-qrcode/master/lib/browser.js">browser entry source</a> on the review date. Inspected candidate web package.</td><td>The recommendation is feasible: browser entry exports canvas/data-URL rendering and SVG string rendering. The web package uses React 19 and has no QR dependency. Maintenance, license suitability, TypeScript integration and bundle size remain explicitly assigned implementation checks. No dependency was adopted or approved by this review.</td><td>PASS</td></tr>
+<tr><td>R05</td><td>Compared Documentation impact with candidate <code>readme.MD</code> and scope.</td><td>README change is specified for implementation: QR use, canonical-origin prerequisite, destination stability, and slug/origin regeneration. Existing README already documents the origin setting. No premature QR capability claim is required in a grooming commit.</td><td>PASS</td></tr>
+<tr><td>R06</td><td>Read all AC/V rows and assessed expected outcomes against source/package evidence.</td><td>Stable IDs and expected outcomes exist. Most procedures are feasible; F02 leaves the promised shared-member path uncovered. No application tests or builds were run.</td><td>FAIL</td></tr>
+</tbody></table>
+
+<h2>Every acceptance and verification check assessed</h2>
+<p>Results below assess the requirement and planned procedure. They do not assert that the unimplemented behavior passes.</p>
+<table><thead><tr><th>ID</th><th>Procedure performed and evidence</th><th>Result and limit</th><th>Outcome</th></tr></thead><tbody>
+<tr><td>AC01 / V01</td><td>Compared candidate member-access criterion and V01 session cases with API route/authentication source and queue dependencies.</td><td>Positive member preview is not explicitly tested; dependency/baseline mismatch also remains. Add separate owner and read-only-member preview/download cases and non-member denial; identify the prerequisite. F01–F02.</td><td>FAIL</td></tr>
+<tr><td>AC02 / V01</td><td>Inspected configured origin validation/fallback and planned configured/unset environment cases.</td><td>Canonical-only QR contract, null when unset, setup explanation and a differing request Host are objectively checkable. Public origin is read at process start; implementation verification must restart the synthetic test process between environment configurations. No configured URL means no QR actions.</td><td>PASS</td></tr>
+<tr><td>AC03 / V02</td><td>Compared export/size/quiet-zone/length requirements with browser renderer exports and V02 decode procedure.</td><td>Fixed PNG size, vector SVG, four-module quiet zone and length rejection are feasible. Procedure decodes both downloads but should also decode the preview or prove it shares the same generated payload/rendering path. Explicitly choose an error-correction level compatible with the accepted maximum payload; routine implementation choice, not a missing product decision. Decoder identity/version and actual outputs remain future evidence.</td><td>PASS with implementation note</td></tr>
+<tr><td>AC04 / V03</td><td>Inspected candidate serializer and destination-update behavior; assessed saved-image/redirect and changed-slug/origin procedure.</td><td>Payload stability follows from origin plus slug, independent of destination. Planned test observes the saved code and updated redirect. Exercise slug and origin changes separately, restarting after environment changes. No redirect was executed in this review.</td><td>PASS</td></tr>
+<tr><td>AC05 / V04</td><td>Read keyboard, name, focus, selectable-URL and 320 CSS-pixel checks.</td><td>Observable accessibility and narrow-screen procedure is sufficient for readiness. Include preview accessible alternative and long-URL wrapping when implementing; no browser/accessibility run was performed here.</td><td>PASS</td></tr>
+<tr><td>V05 / all</td><td>Inspected root/API/web package scripts and <code>pnpm-workspace.yaml</code>; checked <code>Get-Command npm</code>.</td><td>The API test and API/web build scripts exist. The repository uses pnpm workspace configuration; use its filter commands or explicitly establish an npm-compatible environment. npm was absent from this review shell. The review assignment forbids app tests; missing execution is not an application failure. No build/test success is claimed.</td><td>PASS for readiness; execution pending</td></tr>
+</tbody></table>
+
+<h2>Exact inspection commands and results</h2>
+<p>All commands below were run by this reviewer in the stated Windows checkout. <code>git show</code> reads identify immutable candidate evidence; bare file reads describe the mutable working tree. No tests, services, database operations, package installation, staging, commits or queue edits were performed.</p>
+<details><summary>Command record</summary><pre>
+Get-Location
+ git status --short
+ git branch --show-current
+ git rev-parse HEAD
+ git cat-file -t 8448c1eba5de684b5c566c4fb07153ebf9d12eb4
+Get-Content AGENTS.md
+Get-Content docs/AGENTS.md
+Get-Content agent-team/reviewer/AGENTS.md
+Get-Content docs/reviews/2026-11-09-T0004-qr-readiness.html
+Get-Content .agents/skills/clear-effective-writing/SKILL.md
+Get-Content .agents/skills/build-useful-html-artifacts/SKILL.md
+ git show 8448c1eba5de684b5c566c4fb07153ebf9d12eb4:docs/tickets/T-0004-qr-codes/ticket.html
+rg -n 'T-0004|QR|qr' docs/tickets/tickets.jsonl
+ git show 8448c1eba5de684b5c566c4fb07153ebf9d12eb4:docs/tickets/T-0004-qr-downloads/ticket.html
+ git show 8448c1eba5de684b5c566c4fb07153ebf9d12eb4:docs/tickets/tickets.jsonl
+ git show --stat --oneline 8448c1eba5de684b5c566c4fb07153ebf9d12eb4
+rg -n 'PUBLIC_BASE_URL|workspace|require.*(ole|ccess)|qr|QRCode' apps/api/src apps/web/src readme.MD apps/api/package.json apps/web/package.json
+Get-Content docs/reviews/2026-11-09-T0013-readiness.html -TotalCount 65
+ git show 8448c1eba5de684b5c566c4fb07153ebf9d12eb4:apps/api/src/index.ts | Select-String -Pattern 'PUBLIC_BASE_URL|configuredPublicBase|getPublicBaseUrl|function serialize|function getOwnedLink|app.get\("/api/links/:id"|workspaceRole|x-workspace-id' -Context 4,8
+ git show 8448c1eba5de684b5c566c4fb07153ebf9d12eb4:apps/web/package.json
+ git show 8448c1eba5de684b5c566c4fb07153ebf9d12eb4:apps/api/package.json
+ git show 8448c1eba5de684b5c566c4fb07153ebf9d12eb4:package.json
+ git diff -- docs/tickets/T-0004-qr-downloads/ticket.html
+ git show 8448c1eba5de684b5c566c4fb07153ebf9d12eb4:apps/web/src/main.tsx | Select-String -Pattern 'shortUrl|readOnly|workspace.role' -Context 1,2
+ git show 8448c1eba5de684b5c566c4fb07153ebf9d12eb4:apps/api/src/index.ts | Select-String -Pattern 'app.get|app.use|shortUrl:'
+ git show 8448c1eba5de684b5c566c4fb07153ebf9d12eb4:docs/tickets/T-0025-link-invitations/ticket.html
+rg -n 'workspaceRole|workspaceId|getOwnedLink|app.get\("/api/links/:id"|configuredPublicBase|getPublicBaseUrl|shortUrl:' apps/api/src/index.ts
+ git show 8448c1eba5de684b5c566c4fb07153ebf9d12eb4:readme.MD | Select-String -Pattern 'PUBLIC_BASE_URL|prototype|workspace|sign-up'
+ git status --short -- docs/reviews/2026-11-09-T0004-qr-readiness.html docs/tickets/T-0004-qr-downloads/ticket.html
+ git diff --numstat -- apps/api/src/index.ts apps/web/src/main.tsx
+Get-Content pnpm-workspace.yaml
+Get-Command npm | Select-Object Source
+</pre></details>
+<p><strong>Command outcomes:</strong> workspace/branch/hash/type succeeded; ticket diff was empty. First report read returned “Cannot find path” and report creation then succeeded. The initial guessed <code>T-0004-qr-codes</code> path failed; queue lookup resolved the correct <code>T-0004-qr-downloads</code> path. Candidate T-0025 lookup failed because it is absent from that commit, while it exists in the dirty checkout. Package/script/source reads succeeded. npm lookup failed with “The term 'npm' is not recognized as a name of a cmdlet, function, script file, or executable program.” Git emitted LF-to-CRLF notices for unrelated modified API/web files. Browser source retrieval succeeded through the web tool; links above are primary sources and mutable as of the review date.</p>
+
+<h2>Handoff and limits</h2>
+<p><strong>Changed path:</strong> <code>docs/reviews/2026-11-09-T0004-qr-readiness.html</code> only, left unstaged. Candidate ticket and queue remained read-only. Runtime permissions for member access were not exercised; static source comparison established the mismatch. Package compatibility and generated-image readability remain implementation verification. This review does not approve package licensing, deployment, public release, or lifecycle closure.</p>
+<p><strong>One next action:</strong> Coordinator assigns the Requirements Analyst the F01–F02 correction, aligns its prerequisite in the queue, and returns the revised exact candidate for independent readiness review before developer dispatch.</p>
+<p><strong>Final report verification:</strong> Reviewer read back the completed report and checked all local href/src targets with PowerShell regex extraction and Test-Path: 3 references, 0 missing. Trailing-whitespace scan: 0 lines. The scoped git diff --check returned exit 0, but this untracked report is excluded from ordinary Git diff, so that result alone does not validate its content. Scoped status confirms only this report is untracked and the candidate ticket has no working-tree diff.</p></main></body></html>
