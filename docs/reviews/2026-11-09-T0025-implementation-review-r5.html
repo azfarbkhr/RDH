@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-0025 implementation review R5 | Redirect Hub</title>
+<link rel="stylesheet" href="../assets/site.css">
+<script src="../assets/menu.js" defer></script>
+</head>
+<body><main>
+<h1>T-0025 implementation review R5</h1>
+<p><strong>Verdict:</strong> PASS for the current repository implementation. <strong>Candidate:</strong> uncommitted working tree on <code>main</code>, baseline <code>8f63bb5a66655154197e570af1a4a3dfe0b26323</code>. No code, ticket, or queue changes were made by this reviewer.</p>
+<p>This focused R5 reassessment resolves the sole R4 NEEDS-INFO item for the checked-in local app. R4's check-by-check implementation review and independent 12/12 API suite plus API/web builds remain the evidence for the other criteria.</p>
+
+<h2>Focused AC04 / V03 reassessment</h2>
+<table><thead><tr><th>ID</th><th>Evidence reviewed</th><th>Observed result and outcome</th></tr></thead><tbody>
+<tr><td>AC04 / V03 — fragment, request, and history</td><td>Inspected the latest V03 row and handoff in <code>docs/tickets/T-0025-link-invitations/ticket.html</code>, plus route handling and <code>history.replaceState</code> in <code>apps/web/src/main.tsx:359,369,419</code>. The Chrome run was performed by the coordinator in an isolated Vite app at <code>127.0.0.1:5174</code> with a fake API recorder on <code>127.0.0.1:58050</code>, no DB, and a synthetic invitation fragment.</td><td>Pass. The coordinator reports the initial route was replaced before submit; the recorder saw a POST to <code>/api/invitations/redeem</code>, the secret in the JSON body only, and no secret in the request URL or Referer. The Referer was the origin root. After success, browser back returned to the earlier overview entry without restoring the secret. The recorder retained presence booleans/request metadata only, not the raw secret. This is coordinator-observed evidence, not a browser run performed by this reviewer.</td></tr>
+<tr><td>AC04 / V03 — application and access logs</td><td>Independently searched checked-in API source for logging and inspected the injected-failure test; inspected <code>apps/web/vite.config.ts</code> and the ticket's source audit.</td><td>Pass for the checked-in app. The only application console messages are startup messages at <code>apps/api/src/index.ts:741</code> and <code>apps/api/src/mcp.ts:123</code>; <code>app.use</code> is the auth middleware and there is no request logger or body logger. The rollback test captures the application's error output and confirms it does not contain the invitation secret. Vite's checked-in proxy configuration routes paths to the API and contains no body/access logging. No reverse-proxy or deployment access-log configuration is present in this repository.</td></tr>
+<tr><td>V03 — deployment boundary</td><td>Compared the remaining-limit wording in the current ticket and technical guide against the repository's local/self-hosted scope.</td><td>Documented limit, not a blocker for this repository candidate. The ticket distinguishes the checked-in app from a future host's proxy/body logging and does not claim to verify an external deployment. No owner-supplied deployment configuration is needed to close this local implementation ticket. A future deployment owner must ensure their proxy does not record request bodies containing the secret.</td></tr>
+</tbody></table>
+
+<h2>Full-ticket disposition</h2>
+<table><thead><tr><th>ID</th><th>Current review outcome</th><th>Evidence basis</th></tr></thead><tbody>
+<tr><td>AC01 / V01</td><td>Pass</td><td>R4 independent synthetic migration/rerun, record snapshots, public redirect and event tests.</td></tr>
+<tr><td>AC02–AC03 / V02</td><td>Pass</td><td>R4 independent invitation lifecycle/auth tests, hash-only secret persistence, seven-day and exact-expiry tests.</td></tr>
+<tr><td>AC04 / V03</td><td>Pass for checked-in app</td><td>R5 assesses the coordinator's Chrome/history capture, app logging source audit, R4 rollback-log test, and fragment/POST source.</td></tr>
+<tr><td>AC05</td><td>Pass</td><td>R2 and R4 verified the pre-submit warnings and preserved single-use, seven-day, and no-email disclosures.</td></tr>
+<tr><td>AC06 / V03</td><td>Pass</td><td>R4 independent tests cover malformed/wrong secrets, injected transaction rollback, duplicate email, expiry/revocation, and concurrent redemption.</td></tr>
+<tr><td>AC07–AC08 / V04</td><td>Pass</td><td>R4 independently ran the tests for scoped list/detail/rules/tags/analytics/archive reads, guessed IDs, denied writes with DB snapshots, and owner regressions.</td></tr>
+<tr><td>AC09 / V05</td><td>Pass for the tested MCP read path</td><td>R4 independently ran the actual MCP stdio child-process test and confirmed invitee token access remains in the private workspace.</td></tr>
+<tr><td>AC10 / V01</td><td>Pass</td><td>R4 independently ran migration idempotency, country/device/non-match redirect preservation, and event checks.</td></tr>
+<tr><td>AC11</td><td>Pass</td><td>R4 inspected the invitation guide, technical guide, README, and documentation indexes.</td></tr>
+</tbody></table>
+
+<h2>Limits</h2>
+<p>R5 did not rerun API tests/builds because candidate code and tests have not changed since R4; R4 independently recorded <code>pnpm --filter @redirect-hub/api test</code> at 12/12 and passing API/web builds. The Chrome harness and temporary recorder were stopped and removed, so the coordinator's observation is not independently reproducible from saved capture artifacts. This review accepts the detailed, attributed observation plus source checks for the current candidate. The review does not certify a future third-party reverse proxy or hosting provider's logging configuration.</p>
+
+<h2>Next action</h2>
+<p>T-0025 can proceed to coordinator closure review for the current repository implementation. Keep the deployment-specific body-logging caveat in the technical guidance; verify any real proxy configuration separately when a deployment is chosen.</p>
+</main></body></html>

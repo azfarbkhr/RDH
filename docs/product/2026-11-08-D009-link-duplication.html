@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>D-009: Link duplication contents | Redirect Hub</title><link rel="stylesheet" href="../assets/site.css"><script src="../assets/menu.js" defer></script></head><body><main>
+<h1>D-009: Link duplication contents</h1>
+<p><strong>Decision:</strong> Product Owner decision recorded 8 November 2026. <strong>Related ticket:</strong> <a href="../tickets/T-0002-link-organization/ticket.html">T-0002 — Add link names, tags, generated slugs, and archiving</a>. <strong>Independent review:</strong> <a href="../reviews/2026-11-08-T0002-link-organization-readiness.html">T-0002 readiness review</a>.</p>
+
+<h2>Question</h2>
+<p>When a user duplicates a short link, should the copy preserve only its destination and name, or also its tags and routing rules?</p>
+
+<h2>Evidence</h2>
+<ul>
+<li>T-0002's current behavior already supports country/device routing rules and owner-scoped link records.</li>
+<li>Tags and duplication are planned together as link-library organization tools.</li>
+<li>The project goal is to make conditional destinations easy to manage. Copying routing configuration preserves the behavior that makes the source link useful.</li>
+<li>Click events are tied to the source link and represent historical traffic. Copying them would misstate analytics for the new link.</li>
+<li>The independent reviewer found this was the only open T-0002 product decision; migration, ownership, archive, and slug-collision criteria were otherwise feasible.</li>
+</ul>
+
+<h2>Decision</h2>
+<p>For T-0002, duplicate the link name, destination, tags, and routing rules into a new active link with its own globally unique slug and new routing-rule IDs. Do not duplicate click events, analytics, the old slug, or archive state.</p>
+
+<h2>Rationale and trade-offs</h2>
+<p>Copying tags and routing rules preserves the source's editable organization and conditional behavior, reducing repeated setup for a closely related link. The copy begins receiving its own traffic and analytics. A new active link can still receive traffic immediately, so the UI should make the copied destination and rules reviewable before sharing. Copying only name and destination would be simpler but would discard the routing behavior central to this product.</p>
+
+<h2>Scope and conditions</h2>
+<p>This is a delegated Product Owner decision within the owner's requested link-duplication feature; no additional human-owner authorization is required. It does not authorize copying analytics, moving links between owners/workspaces, or implementing workspace memberships. T-0025's later read-only invitation boundary remains separate.</p>
+
+<h2>Next steps</h2>
+<ol>
+<li>Requirements Analyst updates T-0002's handoff to cite D-009; AC05 already matches this decision.</li>
+<li>Independent Reviewer checks the exact updated ticket and confirms the former NEEDS-INFO item is resolved.</li>
+<li>Coordinator may move T-0002 to <code>ready</code> after the review passes, then assign the Developer.</li>
+</ol>
+
+<h2>Decision record</h2>
+<p>Product Owner selected copy name, destination, tags, and routing rules; never copy click history/analytics. Human owner authorization: not required within the already approved T-0002 feature scope.</p>
+</main></body></html>

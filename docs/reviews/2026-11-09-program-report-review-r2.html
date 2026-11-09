@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Program Report Review R2 — Coordinator Handoff</title>
+  <link rel="stylesheet" href="../assets/site.css">
+  <script src="../assets/menu.js" defer></script>
+</head>
+<body><main>
+<h1>Program Report Independent Review R2</h1>
+<p><strong>Status: BLOCKED — no independent verdict was delivered.</strong> This is a coordinator handoff, not a reviewer PASS, FAIL, or completed NEEDS-INFO review.</p>
+
+<h2>Exact candidate</h2>
+<p><a href="../reports/index.html">Program report</a>, SHA-256 <code>75F8CE4EB31DA39FF5FA7C0AF11920DEBF83A24A319127648CBA7B701599D9ED</code>, as observed 9 November 2026 on branch <code>main</code>. The report candidate remained unchanged during both review attempts.</p>
+
+<h2>Attempts and observed result</h2>
+<ol>
+  <li>The assigned Independent Reviewer created only an in-progress marker. The coordinator checked the live assignment and unchanged artifact across repeated passes, requested a completed evidence-based verdict, then interrupted it when no review evidence appeared.</li>
+  <li>One rescue Independent Reviewer verified the workspace, <code>main</code> branch, and exact report hash, then replaced the marker with a rescue in-progress note. After further checks and a direct request, the artifact still contained no claim-by-claim source comparison or verdict. The rescue was interrupted.</li>
+</ol>
+
+<h2>Review checks not completed</h2>
+<ul>
+  <li>Compare the report's as-of date, stage, and queue claims to the canonical queue.</li>
+  <li>Verify T-0013's blocked state and the dependency implications for T-0014, T-0015, and T-0018.</li>
+  <li>Compare reported T-0002, T-0003, and T-0025 outcomes to their independent review artifacts.</li>
+  <li>Check that Product Owner ranking, open decisions, and blocked work are accurately distinguished.</li>
+</ul>
+<p>The coordinator independently checked report hygiene before assigning review: 42 local <code>href</code>/<code>src</code> targets, 0 missing targets, 0 tag-balance errors, no tables, and <code>git diff --check</code> exited 0 with only an LF-to-CRLF notice. Those checks do not substitute for independent content review.</p>
+
+<h2>Handoff</h2>
+<p><strong>Blocker:</strong> neither the reviewer nor the single rescue completed the required independent source comparison. <strong>Next owner:</strong> coordinator. <strong>Next action:</strong> leave this report marked unreviewed and defer a new review assignment until an independent reviewer is available; do not present this report as independently reviewed. The candidate file was not modified by these review attempts.</p>
+</main></body>
+</html>

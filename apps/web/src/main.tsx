@@ -24,22 +24,95 @@ type TagItem = { id: string; name: string; linkCount: number };
 type Analytics = { totalClicks: number; lastSevenDays: number; countries?: Array<{ countryCode: string; clicks: number }>; devices?: Array<{ device: string; clicks: number }>; topLinks?: Array<{ id: string; name: string; slug: string; clicks: number }>; rules?: Array<{ ruleId: string; priority: number; countryCode: string | null; device: string | null; linkName: string; clicks: number }> };
 
 type User = { id: string; email: string };
+type WorkspaceItem = { id: string; name: string; role: "owner" | "member"; isPersonal: number };
 type RouteRule = { id: string; priority: number; countryCode: string | null; device: "mobile" | "desktop" | null; destinationUrl: string };
 type ApiToken = { id: string; name: string; scopes: string; createdAt: string; lastUsedAt: string | null };
 type UtmForm = Record<UtmField, string>;
 const emptyUtm: UtmForm = { source: "", medium: "", campaign: "", term: "", content: "" };
 const utmLabels: Record<UtmField, string> = { source: "Source", medium: "Medium", campaign: "Campaign", term: "Term", content: "Content" };
+let activeWorkspaceId: string | undefined;
+const apiFetch: typeof fetch = (input, init = {}) => {
+  const headers = new Headers(init.headers);
+  if (activeWorkspaceId) headers.set("X-Workspace-ID", activeWorkspaceId);
+  return window.fetch(input, { ...init, headers });
+};
 
 function UtmFields({ prefix, destination, values, onChange }: { prefix: string; destination: string; values: UtmForm; onChange: (field: UtmField, value: string) => void }) {
   const preview = destination.trim() ? (() => { try { return composeDestinationUrl(destination.trim(), values); } catch { return "Enter a valid destination URL to preview UTM values."; } })() : "Enter a destination URL to preview UTM values.";
   return <fieldset className="utm-builder"><legend>Campaign tracking <span className="optional">OPTIONAL</span></legend><p>Add values to this link’s destination. Each value supports up to 200 Unicode characters. Blank fields remove matching UTM values already on the destination.</p><div className="utm-fields">{UTM_FIELDS.map((field) => <label key={field} htmlFor={`${prefix}-utm-${field}`}>UTM {utmLabels[field]}<input id={`${prefix}-utm-${field}`} value={values[field]} onChange={(event) => onChange(field, event.target.value)} placeholder={utmLabels[field]} /></label>)}</div><div className="utm-preview"><span>FINAL DESTINATION PREVIEW</span><code>{preview}</code></div></fieldset>;
 }
-type WorkspaceRoute = "overview" | "links" | "create" | "analytics" | "developer" | "link";
+type WorkspaceRoute = "overview" | "links" | "create" | "analytics" | "developer" | "workspace" | "link" | "redeem";
+type RouteState = { page: WorkspaceRoute; linkId: string | null; invitationSecret: string | null };
 
-function readRoute() {
-  const [page, linkId] = window.location.hash.replace(/^#\/?/, "").split("/");
-  if (page === "link" && linkId) return { page: "link" as WorkspaceRoute, linkId };
-  return { page: (["overview", "links", "create", "analytics", "developer"].includes(page) ? page : "overview") as WorkspaceRoute, linkId: null };
+function readRoute(): RouteState {
+  const hashValue = window.location.hash.replace(/^#\/?/, "");
+  const [routePath, query = ""] = hashValue.split("?");
+  const [page, linkId] = routePath.split("/");
+  if (page === "redeem") return { page: "redeem" as WorkspaceRoute, linkId: null, invitationSecret: new URLSearchParams(query).get("invitation") };
+  if (page === "link" && linkId) return { page: "link", linkId, invitationSecret: null };
+  return { page: (["overview", "links", "create", "analytics", "developer", "workspace"].includes(page) ? page : "overview") as WorkspaceRoute, linkId: null, invitationSecret: null };
+}
+
+function WorkspaceInvitationPanel({ workspaceId }: { workspaceId: string }) {
+  type Invitation = { id: string; createdByUserId: string; createdAt: string; expiresAt: string; redeemedAt: string | null; revokedAt: string | null };
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [newUrl, setNewUrl] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const endpoint = `/api/workspaces/${encodeURIComponent(workspaceId)}/invitations`;
+  const load = useCallback(async () => {
+    setError("");
+    try {
+      const response = await apiFetch(endpoint);
+      const data = await response.json() as { invitations?: Invitation[]; error?: string };
+      if (!response.ok || !data.invitations) throw new Error(data.error ?? "Couldn't load workspace invitations.");
+      setInvitations(data.invitations);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Couldn't load workspace invitations."); }
+  }, [endpoint]);
+  useEffect(() => { void load(); }, [load]);
+  async function create() {
+    setBusy(true); setError(""); setNewUrl("");
+    try {
+      const response = await apiFetch(endpoint, { method: "POST" });
+      const data = await response.json() as { invitation?: { url: string }; error?: string };
+      if (!response.ok || !data.invitation) throw new Error(data.error ?? "Couldn't create an invitation.");
+      setNewUrl(data.invitation.url); await load();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Couldn't create an invitation."); }
+    finally { setBusy(false); }
+  }
+  async function revoke(id: string) {
+    setError("");
+    try {
+      const response = await apiFetch(`${endpoint}/${encodeURIComponent(id)}`, { method: "DELETE" });
+      const data = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Couldn't revoke this invitation.");
+      await load();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Couldn't revoke this invitation."); }
+  }
+  return <section className="panel invitations-panel"><div className="section-heading"><div><div className="eyebrow">WORKSPACE ACCESS</div><h2>Invitations</h2></div><button className="primary-button" disabled={busy} onClick={() => void create()}>{busy ? "Creating…" : "Create invite link"}</button></div><p>Share invite links manually. Each link works once and expires after seven days. People create their account when they join; no email is sent.</p>{error && <p className="feedback error" role="alert">{error}</p>}{newUrl && <div className="invitation-secret"><strong>Copy and share this link now. It cannot be shown again.</strong><code>{newUrl}</code><button className="copy-button" onClick={() => void navigator.clipboard.writeText(newUrl)}>Copy invite link</button></div>}<div className="token-list-heading">INVITATION HISTORY <button className="text-action" onClick={() => void load()}>Refresh</button></div>{invitations.length ? <ul className="token-list invitation-list">{invitations.map((invite) => <li key={invite.id}><span><strong>{invite.redeemedAt ? "Used" : invite.revokedAt ? "Revoked" : Date.parse(invite.expiresAt) <= Date.now() ? "Expired" : "Available"}</strong><small>Expires {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(invite.expiresAt))}</small></span>{!invite.redeemedAt && !invite.revokedAt && Date.parse(invite.expiresAt) > Date.now() && <button className="copy-button" onClick={() => void revoke(invite.id)}>Revoke</button>}</li>)}</ul> : <p className="token-empty">No invitations yet.</p>}</section>;
+}
+
+function InvitationRedemption({ secret, onAttemptFinished, onComplete }: { secret: string; onAttemptFinished: (succeeded: boolean) => void; onComplete: (user: User, workspaces: WorkspaceItem[], workspaceId: string) => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true); setError("");
+    let succeeded = false;
+    try {
+      const response = await window.fetch("/api/invitations/redeem", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ secret, email, password }) });
+      const data = await response.json() as { user?: User; personalWorkspaceId?: string; workspace?: { id: string; name: string; role: "member" }; error?: string };
+      if (!response.ok || !data.user || !data.workspace || !data.personalWorkspaceId) throw new Error(data.error ?? "This invitation could not be redeemed. Check the link and try again.");
+      succeeded = true;
+      onComplete(data.user, [
+        { id: data.personalWorkspaceId, name: "Personal workspace", role: "owner", isPersonal: 1 },
+        { id: data.workspace.id, name: data.workspace.name, role: "member", isPersonal: 0 },
+      ], data.workspace.id);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "This invitation could not be redeemed. Check the link and try again."); }
+    finally { setBusy(false); onAttemptFinished(succeeded); }
+  }
+  return <main className="auth-shell"><a className="brand" href="#/overview" aria-label="Redirect Hub home"><span className="brand-mark" aria-hidden="true">↗</span><span>redirect<span className="brand-accent">hub</span></span></a><section className="panel auth-panel"><div className="eyebrow">WORKSPACE INVITATION</div><h1>Join a workspace.</h1><p>Create an account to get read-only access to its links and analytics. This link expires after seven days and can be used once. Anyone who obtains it can claim it, and the email address you enter is not verified. No email is sent.</p>{error && <div className="feedback error" role="alert">{error}</div>}<form className="link-form" onSubmit={(event) => void submit(event)}><label htmlFor="invite-email">Email address</label><input id="invite-email" type="email" autoComplete="email" required maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com"/><label htmlFor="invite-password">Create password</label><input id="invite-password" type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters"/><button className="primary-button" disabled={busy}>{busy ? "Joining workspace…" : "Create account and join"}<span aria-hidden="true">→</span></button></form></section></main>;
 }
 
 function AuthPanel({ configured, onAuthenticated }: { configured: boolean; onAuthenticated: (user: User) => void }) {
@@ -52,7 +125,7 @@ function AuthPanel({ configured, onAuthenticated }: { configured: boolean; onAut
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError("");
     try {
-      const response = await fetch(registering ? "/api/auth/register" : "/api/auth/login", {
+      const response = await apiFetch(registering ? "/api/auth/register" : "/api/auth/login", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
@@ -84,7 +157,7 @@ function RoutingEditor({ link }: { link: LinkItem }) {
   const loadRules = useCallback(async () => {
     setRulesLoading(true); setRulesError("");
     try {
-      const response = await fetch(`/api/links/${encodeURIComponent(link.id)}/rules`);
+      const response = await apiFetch(`/api/links/${encodeURIComponent(link.id)}/rules`);
       const data = await response.json() as { rules?: RouteRule[]; error?: string };
       if (!response.ok || !Array.isArray(data.rules)) throw new Error(data.error ?? "Couldn't load routing rules.");
       setRules(data.rules);
@@ -105,7 +178,7 @@ function RoutingEditor({ link }: { link: LinkItem }) {
   async function addRule(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setMessage(""); setMessageError(false);
     try {
-      const response = await fetch(`/api/links/${encodeURIComponent(link.id)}/rules`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ countryCode: countryCode.trim() || undefined, device: device || undefined, destinationUrl: ruleDestination }) });
+      const response = await apiFetch(`/api/links/${encodeURIComponent(link.id)}/rules`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ countryCode: countryCode.trim() || undefined, device: device || undefined, destinationUrl: ruleDestination }) });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Couldn't add the rule.");
       setCountryCode(""); setDevice(""); setRuleDestination("");
@@ -120,8 +193,8 @@ function RoutingEditor({ link }: { link: LinkItem }) {
     setMessage(""); setMessageError(false);
     try {
       const response = action === "delete"
-        ? await fetch(`/api/links/${encodeURIComponent(link.id)}/rules/${encodeURIComponent(ruleId)}`, { method: "DELETE" })
-        : await fetch(`/api/links/${encodeURIComponent(link.id)}/rules/${encodeURIComponent(ruleId)}/priority`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ direction: action }) });
+        ? await apiFetch(`/api/links/${encodeURIComponent(link.id)}/rules/${encodeURIComponent(ruleId)}`, { method: "DELETE" })
+        : await apiFetch(`/api/links/${encodeURIComponent(link.id)}/rules/${encodeURIComponent(ruleId)}/priority`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ direction: action }) });
       const data = await response.json() as { rules?: RouteRule[]; error?: string };
       if (!response.ok || !Array.isArray(data.rules)) throw new Error(data.error ?? "Couldn't update the rule.");
       setRules(data.rules); setSimulation(null);
@@ -135,7 +208,7 @@ function RoutingEditor({ link }: { link: LinkItem }) {
   async function simulate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setMessage(""); setMessageError(false);
     try {
-      const response = await fetch(`/api/links/${encodeURIComponent(link.id)}/simulate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ countryCode: simCountry.trim() || undefined, device: simDevice }) });
+      const response = await apiFetch(`/api/links/${encodeURIComponent(link.id)}/simulate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ countryCode: simCountry.trim() || undefined, device: simDevice }) });
       const data = await response.json() as { destinationUrl: string; matched: boolean; matchedPriority: number | null; trace: Array<{ ruleId: string; priority: number; matched: boolean; reasons: string[] }>; error?: string };
       if (!response.ok) throw new Error(data.error ?? "Couldn't simulate this visitor.");
       setSimulation(data);
@@ -168,7 +241,7 @@ function ApiTokenPanel({ onClose, presentation = "dialog" }: { onClose: () => vo
     setTokensLoading(true);
     setTokenLoadError("");
     try {
-      const response = await fetch("/api/auth/tokens");
+      const response = await apiFetch("/api/auth/tokens");
       const data = await response.json() as { tokens?: ApiToken[]; error?: string };
       if (!response.ok) throw new Error(data.error ?? "Couldn't load API tokens.");
       if (requestId !== tokenLoadRequest.current) return;
@@ -213,7 +286,7 @@ function ApiTokenPanel({ onClose, presentation = "dialog" }: { onClose: () => vo
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError(""); setNewToken("");
     try {
-      const response = await fetch("/api/auth/tokens", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, scopes }) });
+      const response = await apiFetch("/api/auth/tokens", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, scopes }) });
       const data = await response.json() as { token?: { id: string; name: string; scopes: string; value: string }; error?: string };
       if (!response.ok || !data.token) throw new Error(data.error ?? "Couldn't create the token.");
       setNewToken(data.token.value); setName(""); await load();
@@ -224,7 +297,7 @@ function ApiTokenPanel({ onClose, presentation = "dialog" }: { onClose: () => vo
   async function revoke(id: string) {
     setError("");
     try {
-      const response = await fetch(`/api/auth/tokens/${encodeURIComponent(id)}`, { method: "DELETE" });
+      const response = await apiFetch(`/api/auth/tokens/${encodeURIComponent(id)}`, { method: "DELETE" });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Couldn't revoke the token.");
       await load();
@@ -241,6 +314,10 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [configured, setConfigured] = useState(false);
+  const [workspaces, setWorkspaces] = useState<WorkspaceItem[]>([]);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("");
+  const [redeemSecret, setRedeemSecret] = useState(() => readRoute().invitationSecret ?? "");
+  const [redeemFailed, setRedeemFailed] = useState(false);
   const [name, setName] = useState("");
   const [destinationUrl, setDestinationUrl] = useState("");
   const [createUtm, setCreateUtm] = useState<UtmForm>(emptyUtm);
@@ -260,27 +337,46 @@ function App() {
   const [selectedTag, setSelectedTag] = useState("");
   const [tags, setTags] = useState<TagItem[]>([]);
   const [editTags, setEditTags] = useState("");
+  const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId);
+  const canManage = !selectedWorkspace || selectedWorkspace.role === "owner";
+  activeWorkspaceId = selectedWorkspaceId || undefined;
 
   function navigate(page: WorkspaceRoute, linkId?: string) {
     const hash = page === "link" && linkId ? `#/link/${encodeURIComponent(linkId)}` : `#/${page}`;
     if (window.location.hash !== hash) window.location.hash = hash;
-    setRoute({ page, linkId: linkId ?? null });
+    setRoute({ page, linkId: linkId ?? null, invitationSecret: null });
     setError(""); setNotice("");
     if (page === "link") setDetailSection("overview");
   }
 
   useEffect(() => {
-    const updateRoute = () => setRoute(readRoute());
+    const updateRoute = () => {
+      const next = readRoute();
+      setRoute(next);
+      if (next.invitationSecret) {
+        setRedeemSecret(next.invitationSecret);
+        setRedeemFailed(false);
+        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#/redeem`);
+      } else setRedeemSecret("");
+    };
     window.addEventListener("hashchange", updateRoute);
     return () => window.removeEventListener("hashchange", updateRoute);
   }, []);
+
+  useEffect(() => {
+    if (route.page === "redeem" && route.invitationSecret) {
+      setRedeemSecret(route.invitationSecret);
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#/redeem`);
+      setRoute({ ...route, invitationSecret: null });
+    }
+  }, [route]);
 
   const refresh = useCallback(async (overrides: { archive?: "active" | "archived" | "all" } = {}) => {
     try {
       const params = new URLSearchParams({ archive: overrides.archive ?? archiveView });
       if (search.trim()) params.set("search", search.trim());
       if (selectedTag) params.set("tag", selectedTag);
-      const [response, analyticsResponse, tagsResponse] = await Promise.all([fetch(`/api/links?${params}`), fetch("/api/analytics"), fetch("/api/tags")]);
+      const [response, analyticsResponse, tagsResponse] = await Promise.all([apiFetch(`/api/links?${params}`), apiFetch("/api/analytics"), apiFetch("/api/tags")]);
       if (!response.ok || !analyticsResponse.ok || !tagsResponse.ok) throw new Error("Could not load your links.");
       const [data, analyticsData, tagsData] = await Promise.all([response.json(), analyticsResponse.json(), tagsResponse.json()]) as [{ links: LinkItem[] }, Analytics, { tags: TagItem[] }];
       setLinks(data.links);
@@ -292,11 +388,14 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, [archiveView, search, selectedTag]);
+  }, [archiveView, search, selectedTag, selectedWorkspaceId]);
 
   useEffect(() => {
-    void fetch("/api/auth/session").then((response) => response.json()).then((data: { user: User | null; configured: boolean }) => {
-      setUser(data.user); setConfigured(data.configured);
+    void apiFetch("/api/auth/session").then((response) => response.json()).then((data: { user: User | null; configured: boolean; workspaces?: WorkspaceItem[] }) => {
+      const nextWorkspaces = data.workspaces ?? [];
+      setUser(data.user); setConfigured(data.configured); setWorkspaces(nextWorkspaces);
+      const selected = nextWorkspaces.find((workspace) => workspace.isPersonal) ?? nextWorkspaces[0];
+      if (selected) setSelectedWorkspaceId(selected.id);
     }).catch(() => setError("Couldn't connect to Redirect Hub. Check that the API server is running, then try again."))
       .finally(() => setAuthChecked(true));
   }, []);
@@ -307,11 +406,20 @@ function App() {
   }, [user, authChecked, refresh]);
 
   async function signOut() {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await apiFetch("/api/auth/logout", { method: "POST" });
     setUser(null); setNotice(""); setError("");
   }
 
   if (!authChecked) return <main className="auth-shell"><span className="brand"><span className="brand-mark" aria-hidden="true">↗</span> redirect<span className="brand-accent">hub</span></span><p role="status">Connecting to your workspace…</p></main>;
+  if (route.page === "redeem") return redeemSecret
+    ? <InvitationRedemption secret={redeemSecret} onAttemptFinished={(succeeded) => { setRedeemSecret(""); setRedeemFailed(!succeeded); }} onComplete={(nextUser, invitedWorkspaces, workspaceId) => {
+        setUser(nextUser); setConfigured(true); setSelectedWorkspaceId(workspaceId); activeWorkspaceId = workspaceId; setRedeemSecret("");
+        setRedeemFailed(false);
+        setWorkspaces(invitedWorkspaces);
+        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#/overview`);
+        setRoute({ page: "overview", linkId: null, invitationSecret: null });
+      }} />
+    : <main className="auth-shell"><section className="panel auth-panel"><h1>{redeemFailed ? "Invitation could not be redeemed." : "Invitation link unavailable."}</h1><p>{redeemFailed ? "This link may be invalid, expired, revoked, or already used. Open a new invitation link or ask the workspace owner to create another." : "This invitation link is missing or has already been cleared. Open the original link again."}</p><a className="text-action" href="#/overview">Go to sign in</a></section></main>;
   if (!user) return <AuthPanel configured={configured} onAuthenticated={(nextUser) => { setUser(nextUser); setConfigured(true); }} />;
 
   async function createLink(event: React.FormEvent<HTMLFormElement>) {
@@ -320,7 +428,7 @@ function App() {
     setNotice("");
     setSubmitting(true);
     try {
-      const response = await fetch("/api/links", {
+      const response = await apiFetch("/api/links", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, destinationUrl, ...Object.fromEntries(UTM_FIELDS.map((field) => [`utm${field[0].toUpperCase()}${field.slice(1)}`, createUtm[field]])), ...(slug.trim() ? { slug: slug.trim() } : {}) }),
@@ -353,7 +461,7 @@ function App() {
   async function manageLink(linkId: string, action: "archive" | "unarchive" | "duplicate") {
     setError(""); setNotice("");
     try {
-      const response = await fetch(`/api/links/${encodeURIComponent(linkId)}/${action}`, { method: "POST" });
+      const response = await apiFetch(`/api/links/${encodeURIComponent(linkId)}/${action}`, { method: "POST" });
       const data = await response.json() as { link?: LinkItem; error?: string };
       if (!response.ok || !data.link) throw new Error(data.error ?? `Couldn't ${action} this link.`);
       const nextView = action === "archive" ? "archived" : "active";
@@ -367,7 +475,7 @@ function App() {
   async function saveTags(linkId: string) {
     setError(""); setNotice("");
     try {
-      const response = await fetch(`/api/links/${encodeURIComponent(linkId)}/tags`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tags: editTags.split(",").map((tag) => tag.trim()).filter(Boolean) }) });
+      const response = await apiFetch(`/api/links/${encodeURIComponent(linkId)}/tags`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tags: editTags.split(",").map((tag) => tag.trim()).filter(Boolean) }) });
       const data = await response.json() as { link?: LinkItem; error?: string };
       if (!response.ok || !data.link) throw new Error(data.error ?? "Couldn't save tags.");
       setNotice("Tags saved."); await refresh();
@@ -377,7 +485,7 @@ function App() {
   async function saveLink(event: React.FormEvent<HTMLFormElement>, linkId: string) {
     event.preventDefault(); setError(""); setNotice("");
     try {
-      const response = await fetch(`/api/links/${encodeURIComponent(linkId)}`, {
+      const response = await apiFetch(`/api/links/${encodeURIComponent(linkId)}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: editName, destinationUrl: editDestination, ...Object.fromEntries(UTM_FIELDS.map((field) => [`utm${field[0].toUpperCase()}${field.slice(1)}`, editUtm[field]])) }),
       });
@@ -391,17 +499,19 @@ function App() {
   const visibleLinks = links;
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${canManage ? "" : "readonly-workspace"}`}>
       <a className="skip-link" href="#main-content">Skip to main content</a>
       <header className="topbar">
         <a className="brand" href="#/overview" aria-label="Redirect Hub home"><span className="brand-mark" aria-hidden="true">↗</span><span>redirect<span className="brand-accent">hub</span></span></a>
-        <nav className="workspace-nav" aria-label="Workspace sections"><a href="#/overview" aria-current={route.page === "overview" ? "page" : undefined}>Overview</a><a href="#/links" aria-current={route.page === "links" || route.page === "link" ? "page" : undefined}>Links <span className="count-pill">{links.length}</span></a><a href="#/analytics" aria-current={route.page === "analytics" ? "page" : undefined}>Analytics</a><a href="#/developer" aria-current={route.page === "developer" ? "page" : undefined}>Developer</a></nav>
-        <div className="topbar-actions"><span className="account-email">{user.email}</span><button className="signout-button" onClick={() => void signOut()}>Sign out</button></div>
+        <nav className="workspace-nav" aria-label="Workspace sections"><a href="#/overview" aria-current={route.page === "overview" ? "page" : undefined}>Overview</a><a href="#/links" aria-current={route.page === "links" || route.page === "link" ? "page" : undefined}>Links <span className="count-pill">{links.length}</span></a><a href="#/analytics" aria-current={route.page === "analytics" ? "page" : undefined}>Analytics</a>{canManage && <><a href="#/workspace" aria-current={route.page === "workspace" ? "page" : undefined}>Workspace</a><a href="#/developer" aria-current={route.page === "developer" ? "page" : undefined}>Developer</a></>}</nav>
+        <div className="topbar-actions">{workspaces.length > 1 && <label className="workspace-switcher"><span className="visually-hidden">Active workspace</span><select aria-label="Active workspace" value={selectedWorkspaceId} onChange={(event) => { setSelectedWorkspaceId(event.target.value); setLinks([]); setLoading(true); setSearch(""); setSelectedTag(""); setArchiveView("active"); navigate("overview"); }}>
+          {workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}{workspace.role === "member" ? " · read only" : ""}</option>)}
+        </select></label>}{selectedWorkspace?.role === "member" && <span className="readonly-badge">Read only</span>}<span className="account-email">{user.email}</span><button className="signout-button" onClick={() => void signOut()}>Sign out</button></div>
       </header>
 
       <main className="main-content" id="main-content">
         {route.page === "overview" && <>
-          <section className="page-intro"><div><div className="eyebrow"><span className="status-dot" /> YOUR WORKSPACE</div><h1>Good links, clearly managed.</h1><p className="intro-copy">A calm home for your short links and where they take people.</p></div><button className="primary-button" onClick={() => navigate("create")}>Create a link <span aria-hidden="true">→</span></button></section>
+          <section className="page-intro"><div><div className="eyebrow"><span className="status-dot" /> YOUR WORKSPACE</div><h1>Good links, clearly managed.</h1><p className="intro-copy">A calm home for your short links and where they take people.</p></div>{canManage && <button className="primary-button" onClick={() => navigate("create")}>Create a link <span aria-hidden="true">→</span></button>}</section>
           <section className="overview-metrics"><article><span>LINKS</span><strong>{loading ? "—" : links.length}</strong><small>In this workspace</small></article><article><span>ALL-TIME CLICKS</span><strong>{analytics.totalClicks.toLocaleString()}</strong><small>Bot traffic excluded</small></article><article><span>LAST 7 DAYS</span><strong>{analytics.lastSevenDays.toLocaleString()}</strong><small>Privacy-aware analytics</small></article></section>
           <section className="content-section"><div className="section-heading"><div><div className="eyebrow">RECENTLY CREATED</div><h2>Recent links</h2></div><button className="text-action" onClick={() => navigate("links")}>View all links →</button></div>{loading ? <div className="empty-state"><p>Loading your links…</p></div> : links.length === 0 ? <div className="empty-state"><span className="empty-icon">↗</span><h3>Your first link starts here</h3><p>Create a short link and it’ll be ready to share.</p><button className="primary-button" onClick={() => navigate("create")}>Create your first link</button></div> : <div className="link-list">{links.slice(0, 5).map((link) => <article className="link-card" key={link.id}><div className="link-card-top"><div className="link-description"><button className="link-name-button" onClick={() => navigate("link", link.id)}>{link.name}</button><time dateTime={link.createdAt}>{new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(link.createdAt))}</time></div><button className="copy-button" onClick={() => void copyLink(link.shortUrl)}>Copy</button></div><a className="short-link" href={link.shortUrl}>{link.shortUrl}</a></article>)}</div>}</section>
         </>}
@@ -417,7 +527,7 @@ function App() {
         {notice && <div className="feedback success" role="status"><span aria-hidden="true">✓</span><span>{notice}</span><button className="feedback-close" onClick={() => setNotice("")} aria-label="Dismiss message">×</button></div>}
 
         <div className="workspace-grid">
-          {route.page === "create" && <section id="create-link" className="panel create-panel" aria-labelledby="create-heading">
+          {route.page === "create" && (canManage ? <section id="create-link" className="panel create-panel" aria-labelledby="create-heading">
             <div className="panel-heading"><span className="heading-icon" aria-hidden="true">＋</span><div><h2 id="create-heading">Create a link</h2><p>Give a destination a short, memorable address.</p></div></div>
             <form onSubmit={createLink} className="link-form">
               <label htmlFor="link-name">Link name <span className="required">*</span></label>
@@ -430,10 +540,10 @@ function App() {
               <button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Creating link…" : "Create short link"}<span aria-hidden="true">→</span></button>
               <p className="form-footnote"><span aria-hidden="true">◉</span> Your destination stays editable after sharing.</p>
             </form>
-          </section>}
+          </section> : <section className="panel create-panel"><h2>Read-only workspace</h2><p>You can browse and analyze links in this workspace, but only its owner can create or edit links.</p><button className="copy-button" onClick={() => navigate("links")}>Back to links</button></section>)}
 
           {route.page === "links" && <section id="links" className="links-section" aria-labelledby="links-heading">
-            <div className="page-intro"><div><div className="eyebrow">LINK LIBRARY</div><h1 id="links-heading">Your links <span className="count-pill">{loading ? "…" : links.length}</span></h1><p className="intro-copy">Find, copy, and manage every destination in your collection.</p></div><button className="primary-button" onClick={() => navigate("create")}>Create link →</button></div>
+            <div className="page-intro"><div><div className="eyebrow">LINK LIBRARY</div><h1 id="links-heading">Your links <span className="count-pill">{loading ? "…" : links.length}</span></h1><p className="intro-copy">Find, copy, and manage every destination in your collection.</p></div>{canManage && <button className="primary-button" onClick={() => navigate("create")}>Create link →</button>}</div>
             <div className="link-tools"><label className="search-field"><span aria-hidden="true">⌕</span><span className="visually-hidden">Search links</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search links by name, code, or destination" /></label><button className="refresh-button" onClick={() => void refresh()} aria-label="Refresh links">↻</button></div>
             <div className="link-filters" aria-label="Filter links"><div className="archive-tabs" role="group" aria-label="Link status">{(["active", "archived", "all"] as const).map((view) => <button key={view} type="button" aria-pressed={archiveView === view} onClick={() => setArchiveView(view)}>{view === "active" ? "Active" : view === "archived" ? "Archived" : "All links"}</button>)}</div><label className="tag-filter">Tag<select value={selectedTag} onChange={(event) => setSelectedTag(event.target.value)}><option value="">All tags</option>{tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name} ({tag.linkCount})</option>)}</select></label></div>
             {loading ? <div className="empty-state"><span className="empty-icon" aria-hidden="true">◌</span><p>Loading your links…</p></div> : visibleLinks.length === 0 ? <div className="empty-state"><span className="empty-icon" aria-hidden="true">↗</span><h3>{search || selectedTag ? "No matching links" : archiveView === "archived" ? "No archived links" : archiveView === "active" ? "No active links yet" : "No links yet"}</h3><p>{search || selectedTag ? "Try a different search or tag." : archiveView === "archived" ? "Archived links stay available here and keep redirecting." : "Create a short link and it’ll be ready to share."}</p>{archiveView !== "archived" && !search && !selectedTag && <button className="primary-button" onClick={() => navigate("create")}>Create a link</button>}</div> : <div className="link-list">{visibleLinks.map((link) => <article className="link-card" key={link.id}><div className="link-card-top"><div className="link-description"><button className="link-name-button" onClick={() => navigate("link", link.id)}>{link.name}</button><time dateTime={link.createdAt}>{new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(link.createdAt))}{link.archivedAt ? " · Archived" : ""}</time></div><span className="link-clicks">{typeof link.clickCount === "number" ? `${link.clickCount} clicks` : "— clicks"}</span><button className="copy-button" onClick={() => void copyLink(link.shortUrl)}>Copy</button><button className="copy-button" onClick={() => navigate("link", link.id)}>Details</button></div><a className="short-link" href={link.shortUrl}>{link.shortUrl}</a><div className="destination"><span>GOES TO</span><a href={link.destinationUrl} target="_blank" rel="noreferrer" title={link.destinationUrl}>{link.destinationUrl}<span aria-hidden="true"> ↗</span></a></div><div className="link-card-bottom">{(link.tags ?? []).length ? <div className="tag-chips">{link.tags!.map((tag) => <span key={tag}>{tag}</span>)}</div> : <span className="no-tags">No tags</span>}<div className="link-actions"><button className="copy-button" onClick={() => void manageLink(link.id, "duplicate")}>Duplicate</button><button className="copy-button" onClick={() => void manageLink(link.id, link.archivedAt ? "unarchive" : "archive")}>{link.archivedAt ? "Restore" : "Archive"}</button></div></div></article>)}</div>}
@@ -442,13 +552,14 @@ function App() {
         {route.page === "link" && (activeLink ? <section className="link-detail-page">
           <button className="back-link" onClick={() => navigate("links")}>← Back to links</button>
           <div className="page-intro detail-intro"><div><div className="eyebrow">LINK DETAILS · /l/{activeLink.slug}</div><h1>{activeLink.name}</h1><p className="intro-copy">{activeLink.destinationUrl}</p></div><button className="copy-button" onClick={() => void copyLink(activeLink.shortUrl)}>Copy short link</button></div>
-          <nav className="detail-tabs" aria-label="Link sections">{(["overview", "routing", "analytics", "settings"] as const).map((section) => <button key={section} aria-current={detailSection === section ? "page" : undefined} onClick={() => { setDetailSection(section); setEditName(activeLink.name); setEditDestination(activeLink.destinationUrl); setEditUtm({ source: activeLink.utmSource ?? "", medium: activeLink.utmMedium ?? "", campaign: activeLink.utmCampaign ?? "", term: activeLink.utmTerm ?? "", content: activeLink.utmContent ?? "" }); setEditTags((activeLink.tags ?? []).join(", ")); }}>{section[0].toUpperCase() + section.slice(1)}</button>)}</nav>
+          <nav className="detail-tabs" aria-label="Link sections">{(canManage ? ["overview", "routing", "analytics", "settings"] as const : ["overview", "routing", "analytics"] as const).map((section) => <button key={section} aria-current={detailSection === section ? "page" : undefined} onClick={() => { setDetailSection(section); setEditName(activeLink.name); setEditDestination(activeLink.destinationUrl); setEditUtm({ source: activeLink.utmSource ?? "", medium: activeLink.utmMedium ?? "", campaign: activeLink.utmCampaign ?? "", term: activeLink.utmTerm ?? "", content: activeLink.utmContent ?? "" }); setEditTags((activeLink.tags ?? []).join(", ")); }}>{section[0].toUpperCase() + section.slice(1)}</button>)}</nav>
           {detailSection === "overview" && <section className="detail-grid"><article className="panel detail-card"><span className="eyebrow">SHORT LINK</span><a className="detail-short-url" href={activeLink.shortUrl}>{activeLink.shortUrl}</a><button className="copy-button" onClick={() => void copyLink(activeLink.shortUrl)}>Copy URL</button></article><article className="panel detail-card"><span className="eyebrow">DESTINATION</span><a className="detail-destination" href={activeLink.destinationUrl} target="_blank" rel="noreferrer">{activeLink.destinationUrl} ↗</a><small>Created {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(activeLink.createdAt))}</small></article><article className="panel detail-card"><span className="eyebrow">LINK ACTIVITY</span><strong className="detail-metric">{typeof activeLink.clickCount === "number" ? activeLink.clickCount.toLocaleString() : "—"}</strong><small>{typeof activeLink.clickCount === "number" ? "Recorded clicks" : "Open workspace analytics for activity"}</small></article></section>}
           {detailSection === "routing" && <section className="panel detail-wide"><div className="section-heading"><div><div className="eyebrow">DESTINATION RULES</div><h2>Routing</h2><p>Send different visitors to a destination that fits them.</p></div></div><RoutingEditor key={activeLink.id} link={activeLink}/></section>}
           {detailSection === "analytics" && <section className="panel detail-wide"><div className="eyebrow">LINK PERFORMANCE</div><h2>Analytics for {activeLink.name}</h2><div className="empty-state"><p>Per-link analytics are not available yet. Workspace-wide traffic is available on Analytics.</p><button className="text-action" onClick={() => navigate("analytics")}>Open workspace analytics →</button></div></section>}
           {detailSection === "settings" && <section className="panel detail-wide"><div className="eyebrow">LINK SETTINGS</div><h2>Update this link</h2><p>The short URL stays the same when you change its name or destination.</p><form className="link-form settings-form" onSubmit={(event) => void saveLink(event, activeLink.id)}><label htmlFor={`edit-name-${activeLink.id}`}>Link name</label><input id={`edit-name-${activeLink.id}`} value={editName} onChange={(event) => setEditName(event.target.value)} required maxLength={80}/><label htmlFor={`edit-destination-${activeLink.id}`}>Destination URL</label><input id={`edit-destination-${activeLink.id}`} type="url" value={editDestination} onChange={(event) => setEditDestination(event.target.value)} required maxLength={2048}/><UtmFields prefix={`edit-${activeLink.id}`} destination={editDestination} values={editUtm} onChange={(field, value) => setEditUtm((current) => ({ ...current, [field]: value }))} /><div className="form-actions"><button className="primary-button" type="submit">Save changes</button><button className="copy-button" type="button" onClick={() => setDetailSection("overview")}>Cancel</button></div></form><form className="link-form settings-form tag-editor" onSubmit={(event) => { event.preventDefault(); void saveTags(activeLink.id); }}><label htmlFor={`edit-tags-${activeLink.id}`}>Tags <span className="optional">COMMA SEPARATED</span></label><input id={`edit-tags-${activeLink.id}`} value={editTags} onChange={(event) => setEditTags(event.target.value)} placeholder="Launch, Social, Q4"/><button className="copy-button" type="submit">Save tags</button></form><div className="archive-control"><div><strong>{activeLink.archivedAt ? "This link is archived" : "Archive this link"}</strong><p>{activeLink.archivedAt ? "It remains reachable and continues redirecting visitors." : "The short URL will keep redirecting after you archive it."}</p></div><button className="copy-button" onClick={() => void manageLink(activeLink.id, activeLink.archivedAt ? "unarchive" : "archive")}>{activeLink.archivedAt ? "Restore link" : "Archive link"}</button></div><div className="form-actions duplicate-control"><button className="copy-button" onClick={() => void manageLink(activeLink.id, "duplicate")}>Duplicate link</button></div></section>}
         </section> : <div className="empty-state"><h1>Link not found</h1><p>This link may have been removed or belongs to another workspace.</p><button className="primary-button" onClick={() => navigate("links")}>Back to links</button></div>)}
-        {route.page === "developer" && <section className="developer-page"><div className="page-intro"><div><div className="eyebrow">BUILD WITH REDIRECT HUB</div><h1>Developer access</h1><p className="intro-copy">Manage credentials for your API tools and local MCP setup.</p></div></div><ApiTokenPanel presentation="page" onClose={() => undefined}/></section>}
+          {route.page === "workspace" && selectedWorkspace && canManage && <section className="developer-page"><div className="page-intro"><div><div className="eyebrow">WORKSPACE SETTINGS</div><h1>{selectedWorkspace.name}</h1><p className="intro-copy">Manage access for people who need to view links and analytics.</p></div></div><WorkspaceInvitationPanel key={selectedWorkspace.id} workspaceId={selectedWorkspace.id}/></section>}
+          {route.page === "developer" && canManage && <section className="developer-page"><div className="page-intro"><div><div className="eyebrow">BUILD WITH REDIRECT HUB</div><h1>Developer access</h1><p className="intro-copy">Manage credentials for your API tools and local MCP setup.</p></div></div><ApiTokenPanel presentation="page" onClose={() => undefined}/></section>}
       </main>
     </div>
   );

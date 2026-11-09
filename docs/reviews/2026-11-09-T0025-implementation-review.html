@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-0025 implementation review | Redirect Hub</title>
+<link rel="stylesheet" href="../assets/site.css">
+<script src="../assets/menu.js" defer></script>
+</head>
+<body><main>
+<h1>T-0025 implementation review</h1>
+<p><strong>Verdict:</strong> FAIL. <strong>Candidate:</strong> working tree on <code>main</code>, baseline <code>8f63bb5a66655154197e570af1a4a3dfe0b26323</code>; no commit. The checkout contains unrelated dirty workstreams, so this review identifies the T-0025 candidate by its changed paths and does not assign a commit hash.</p>
+<p><strong>Review scope:</strong> API and UI behavior, migration, security boundaries, documentation, and implementation verification for AC01–AC11. Candidate code, docs, and ticket queue were not changed by the reviewer. Review report: <code>docs/reviews/2026-11-09-T0025-implementation-review.html</code>.</p>
+
+<h2>Environment and independent verification</h2>
+<ul>
+<li>Workspace: <code>D:\WorkITAAI\RDH</code>; branch <code>main</code>; Node <code>v24.22.1</code>; pnpm <code>11.25.0</code>.</li>
+<li><code>pnpm --filter @redirect-hub/api test</code> — PASS, 8 tests, 8 passed, 0 failed. Independently run by the reviewer on the synthetic temporary SQLite fixtures.</li>
+<li><code>pnpm --filter @redirect-hub/api build</code> — PASS, <code>tsc --noEmit</code>.</li>
+<li><code>pnpm --filter @redirect-hub/web build</code> — PASS, <code>tsc -b</code> and Vite production build.</li>
+<li><code>git diff --check</code> — exit 0; only line-ending conversion warnings were printed.</li>
+<li>Did not inspect or modify <code>data/redirect-hub.sqlite</code>.</li>
+</ul>
+
+<h2>Acceptance-check review</h2>
+<table><thead><tr><th>ID</th><th>Procedure and evidence</th><th>Observed result and outcome</th></tr></thead><tbody>
+<tr><td>AC01 / V01</td><td>Ran the API suite; inspected <code>apps/api/src/db.ts</code> and <code>apps/api/tests/workspaces-and-invitations.test.ts</code>, including the startup migration fixture.</td><td>Partial pass. Synthetic two-account fixture verifies distinct private workspaces, links assigned to matching owners, preservation of legacy unowned links, tag/token/click associations, and unchanged default/CA-matched public redirects plus new click events. Registration provisions a private owner workspace. Explicit second startup against the same DB was not tested, so migration idempotency remains unverified.</td></tr>
+<tr><td>AC02</td><td>Ran invitation API integration tests; inspected invitation handlers and request authentication in <code>apps/api/src/index.ts</code>.</td><td>Pass for tested paths. Owner session creates/lists/revokes; a different workspace owner cannot list another workspace; invited member cannot administer invitations; owner bearer token is denied because the route requires session authentication. Listing exposes status fields without secret material.</td></tr>
+<tr><td>AC03 / V02</td><td>Ran the API integration suite and inspected secret creation/storage/expiry predicates in <code>apps/api/src/index.ts</code>.</td><td>Pass for tested paths. Secret uses 32 random bytes; only SHA-256 is stored; create response returns the copyable fragment URL; listing and redemption responses omit secret/hash; exact seven-day delta is asserted; revocation and already-expired invitation are tested. Strict <code>expires_at &gt; now</code> rejects at expiry by code inspection, but no frozen-clock boundary test was run.</td></tr>
+<tr><td>AC04 / V03</td><td>Inspected route parsing and redemption state in <code>apps/web/src/main.tsx</code>, and redemption handlers in <code>apps/api/src/index.ts</code>; ran API tests.</td><td>Partial pass. Client reads the secret from the hash fragment, uses <code>history.replaceState</code> to remove it before form submission, POSTs it in JSON, and clears transient state in <code>finally</code>. API tests check secret redaction in response/listing bodies. No browser history, network URL/body/referrer capture or proxy/application-log search was performed; malformed/wrong-secret and injected account-creation-failure paths were not tested.</td></tr>
+<tr><td>AC05</td><td>Compared the recipient-facing text in <code>apps/web/src/main.tsx</code> with AC05, and inspected <code>docs/user-guides/invitations.html</code>.</td><td><strong>Fail.</strong> The redemption page states the seven-day expiry, single-use behavior, read-only access, and that no email is sent. It does not tell the recipient that anyone holding the bearer URL can claim it or that the entered email is not verified. The user guide contains both warnings, but AC05 requires the redemption UI to state them too. This is the concrete correction required for a passing implementation review.</td></tr>
+<tr><td>AC06 / V03</td><td>Ran the synthetic API tests for valid redemption, duplicate email, expired/revoked/used invitations, and simultaneous attempts; inspected the transaction in <code>apps/api/src/index.ts</code>.</td><td>Partial pass. <code>BEGIN IMMEDIATE</code> encloses account/private workspace/member/session creation and conditional invitation consumption. Tests confirm one winner among two concurrent requests and no consumed state for duplicate email. Account-creation failure injection and malformed/wrong-secret cases were not run; rollback is verified by inspection, not injected failure.</td></tr>
+<tr><td>AC07 / V04</td><td>Ran member read/simulator tests; inspected workspace scoping for links, rules, tags, and analytics in <code>apps/api/src/index.ts</code>, and UI role handling in <code>apps/web/src/main.tsx</code>.</td><td>Partial pass. Tested member can read shared links/analytics and simulate routing; direct link/rule reads are scoped by workspace in code. UI provides a workspace selector with a read-only label and hides write controls. Endpoint-by-endpoint detail/tag/archive reads and guessed IDs from an independent user were not all exercised.</td></tr>
+<tr><td>AC08 / V04</td><td>Ran member denial tests for create/update link, tag update, archive, duplicate, rule create/delete/reorder, invitation administration, and token listing; checked DB counts/link state. Inspected remaining mutation guards in <code>apps/api/src/index.ts</code>.</td><td>Partial pass. Tested denied writes return 403 and link/rule/tag state remains unchanged; code guards the remaining owner-only token and link mutation routes. Token create/revoke denial and a comprehensive owner-regression pass were not separately exercised. No delete-link or account-admin routes exist in the inspected route list.</td></tr>
+<tr><td>AC09 / V05</td><td>Inspected bearer-token workspace resolution and MCP's use of authenticated API tokens in <code>apps/api/src/index.ts</code> and <code>apps/api/src/mcp.ts</code>; ran API tests for owner-token invitation denial and member token-management denial.</td><td>Partial pass. Bearer tokens resolve to the token owner's private workspace and reject a different <code>X-Workspace-ID</code>; members cannot manage tokens from a shared workspace. No live MCP-client attempt was made. The API tests do not prove all MCP calls are denied in a joined workspace.</td></tr>
+<tr><td>AC10 / V01</td><td>Ran the migration fixture and public redirect assertions in <code>apps/api/tests/workspaces-and-invitations.test.ts</code>.</td><td>Partial pass. Existing default and CA-matched redirects still resolve to their prior destinations, existing click rows remain associated, and subsequent redirect events are recorded. Other supported device/country combinations and rerunning migration were not tested.</td></tr>
+<tr><td>AC11 / V05</td><td>Inspected <code>docs/user-guides/invitations.html</code>, <code>docs/technical/workspaces-and-invitations.html</code>, the docs indexes, and README.</td><td>Pass by content inspection. User and technical docs explain owner-only manual sharing, one-time copy, seven-day/single-use expiry, unverified email, bearer forwarding risk, read-only access, and no email/shared-workspace API/MCP access. README points to the invitation guide.</td></tr>
+</tbody></table>
+
+<h2>Independent browser observation</h2>
+<p>The coordinator separately observed the logged-in demo owner view at <code>http://127.0.0.1:5173/#/workspace</code>: Workspace navigation, workspace name, Create invite link, seven-day/single-use/no-email copy, and empty invitation history were visible. This supports owner-screen presence only; it does not prove member UI behavior or browser network/history/referrer handling.</p>
+
+<h2>Correction and remaining evidence</h2>
+<p>Bounded correction: update the invitation redemption UI to say that anyone with the unused link can claim it and that the entered email is not verified. Preserve the existing generic failure behavior and rerun the web production build. After correction, review the changed candidate again. Before ticket closure, the coordinator should decide whether the documented V01/V03/V04/V05 evidence limits require additional checks; the current record accurately identifies them as partial.</p>
+<p>Reviewer verification above is independent of the developer-reported results. Candidate is still uncommitted; any later code change is a new candidate and requires review again.</p>
+</main></body></html>

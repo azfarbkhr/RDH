@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-0004 correction handoff | Redirect Hub</title>
+<link rel="stylesheet" href="../assets/site.css">
+<script src="../assets/menu.js" defer></script>
+</head>
+<body><main>
+<h1>T-0004 correction handoff</h1>
+<p><strong>Status: BLOCKED.</strong> Requirements readiness corrections were not completed after the original correction assignment and one rescue attempt. No QR application implementation was dispatched.</p>
+
+<h2>Authoritative review</h2>
+<p>Independent readiness review <a href="2026-11-09-T0004-qr-readiness.html">T-0004 QR definition-of-ready review</a> recorded FAIL for exact ticket candidate <code>8448c1eba5de684b5c566c4fb07153ebf9d12eb4</code>. Review record commit: <code>be85de3ee93f14e16d5174bc2011ba230c74b208</code>.</p>
+<ul>
+<li>F01: distinguish committed owner-only API behavior from uncommitted workspace changes, and declare T-0025 as the read-only membership prerequisite.</li>
+<li>F02: specify owner and authorized read-only member preview/download checks separately, plus a non-member denial.</li>
+<li>V05: use the repository's pnpm workspace commands; clarify the V02 preview payload check.</li>
+</ul>
+
+<h2>Correction attempts</h2>
+<ol>
+<li>The Requirements Analyst correction assignment added only an in-progress marker to <code>docs/tickets/T-0004-qr-downloads/ticket.html</code>, then remained unchanged after a follow-up. The assignment was interrupted.</li>
+<li>One rescue Requirements Analyst confirmed workspace, branch, and write access, replaced the progress marker, but did not update the criteria or verification plan through three subsequent coordinator checks and a direct follow-up. The rescue was interrupted. No additional rescue is planned in this correction cycle.</li>
+</ol>
+<p>Coordinator inspection confirmed the ticket's original criteria and procedures remained unchanged. The temporary marker was removed. The T-0004 application code, tests, dependencies, and database were not changed by these correction attempts.</p>
+
+<h2>Queue and next action</h2>
+<p>The coordinator set the queue record to <code>blocked</code>, retained dependency T-0002, and added T-0025 as the read-only membership prerequisite. The queue is the sole lifecycle authority. No candidate commit was created for an incomplete correction.</p>
+<p><strong>Next owner:</strong> Program Manager. Refresh the project status report to reflect the T-0004 blocker and its dependent-work impact. After that reporting assignment, the coordinator selects the next actionable ticket from the queue and recorded Product Owner direction. T-0004 can resume when a corrected ticket is produced and submitted as a new exact candidate for independent readiness review.</p>
+
+<h2>Evidence and limits</h2>
+<ul>
+<li><code>docs/reviews/2026-11-09-T0004-qr-readiness.html</code> records each AC/V review result and exact candidate evidence.</li>
+<li><code>docs/tickets/T-0004-qr-downloads/ticket.html</code> has no remaining correction marker; its requirements are still the failed candidate content.</li>
+<li><code>docs/tickets/tickets.jsonl</code> is the sole source for T-0004 status, dependency, and ticket path.</li>
+<li>No implementation, application tests/builds, browser checks, package installs, services, or database actions were run for the correction attempt.</li>
+</ul>
+</main></body>
+</html>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>T-0001 UI implementation review, round 2 | Redirect Hub</title>
+  <link rel="stylesheet" href="../assets/site.css">
+  <script defer src="../assets/menu.js"></script>
+</head>
+<body>
+  <main>
+    <h1>T-0001 UI implementation review, round 2</h1>
+    <p><strong>Verdict: NEEDS-INFO.</strong> The AC01 token-list defect from the prior review is corrected in source. The build passes. AC01's screenshot comparison and authenticated states, AC02's specified viewport walkthrough, and AC03's keyboard and contrast procedures still lack evidence.</p>
+
+    <h2>Candidate reviewed</h2>
+    <ul>
+      <li><strong>Candidate commit:</strong> None; source and docs remain uncommitted in the shared checkout.</li>
+      <li><strong>Workspace / branch:</strong> <code>D:\WorkITAAI\RDH</code> / <code>main</code>.</li>
+      <li><strong>Candidate SHA-256:</strong> <code>apps/web/src/main.tsx</code> — <code>B779145AD28A689E6C1AC17A381CC4362195481655B92510F9C9F8B38823E01D</code>; <code>apps/web/src/styles.css</code> — <code>77EDDD96EB1CEE5657FBA46AB66402C37DA4F2F4BFAD52F7F1C3373DE06084E1</code>; T-0001 ticket — <code>854C3027A2A814B82B6F0F0680D22E7C5133339AF8658168643B9CF6FEAD7233</code>. These matched the dispatch hashes before review.</li>
+      <li><strong>Reviewed artifacts:</strong> <code>apps/web/src/main.tsx</code>, <code>apps/web/src/styles.css</code>, and <a href="../tickets/T-0001-app-ui-redesign/ticket.html">T-0001 ticket</a>.</li>
+    </ul>
+
+    <h2>Acceptance review</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Procedure and evidence</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>AC01 / V01</td><td>Inspected the corrected token-panel code and UI styles. <code>ApiTokenPanel</code> now distinguishes <code>tokensLoading</code>, <code>tokenLoadError</code>, a successfully loaded empty list, and populated tokens. Retry calls the same loader; token creation is disabled while loading or after a load error. A monotonically increasing request ID prevents an older response from replacing state from a newer load. This resolves the prior false “No active API tokens” state during a pending or failed fetch. Independently ran <code>pnpm build</code> in Windows PowerShell; API TypeScript check and web TypeScript/Vite production build passed (exit code 0). The ticket records the coordinator's read-only 1920×1080 Chrome observation of first-run setup only.</td><td><strong>NEEDS-INFO.</strong> The reported source correction is present and the build passes, but V01 asks for before/after captures and inspection of all in-scope screens and feedback states. No authenticated workspace or token state was observed; no before/after set exists.</td></tr>
+        <tr><td>AC02 / V02</td><td>Inspected CSS media rules at 1000px, 760px, 560px, and 380px; the workspace changes to one column below 760px and further adjusts navigation, cards, rule fields, and token form at smaller breakpoints. The Chrome observation was at 1920×1080 and showed only first-run setup.</td><td><strong>NEEDS-INFO.</strong> The ticket's 390px and 1440px walkthroughs, page-overflow checks, and authenticated screen checks were not performed. Breakpoint declarations alone do not verify rendered behavior.</td></tr>
+        <tr><td>AC03 / V03</td><td>Inspected source for the skip-link destination, semantic labels, focus-visible styling, and token-dialog focus return, Escape close, and Tab cycling. These mechanisms are present in code.</td><td><strong>NEEDS-INFO.</strong> No keyboard-only walkthrough or text/control contrast measurements were performed, so successful completion and WCAG AA ratios are unverified.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Verification and limits</h2>
+    <ul>
+      <li><strong>Reviewer, Windows PowerShell:</strong> <code>pnpm build</code> — exit code 0; API type-check and web type-check/Vite production build completed.</li>
+      <li><strong>Reviewer, Windows PowerShell:</strong> <code>git diff --check</code> — exit code 0; Git emitted existing LF/CRLF conversion warnings on modified documentation files.</li>
+      <li>No automated tests were added or run.</li>
+      <li>The coordinator's Chrome check was read-only and showed first-run setup at 1920×1080. No owner account was created. Authenticated workspace, routing, analytics, and token screens; 390px/1440px viewport behavior; keyboard walkthrough; contrast measurements; and screenshot comparison remain unverified.</li>
+    </ul>
+
+    <h2>Handoff</h2>
+    <p><strong>UI Developer:</strong> no source correction is identified by this review; the prior AC01 defect appears fixed in the exact reviewed code. <strong>Coordinator:</strong> keep T-0001 in review/in progress until the missing AC01–AC03 evidence is obtained. Request owner authorization before creating a local synthetic owner account to inspect authenticated screens; then complete V01–V03 and route the evidence for an exact-candidate review. This reviewer did not modify source, ticket, or queue metadata.</p>
+  </main>
+</body>
+</html>

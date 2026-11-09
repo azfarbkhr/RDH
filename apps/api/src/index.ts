@@ -1,5 +1,5 @@
 import { serve } from "@hono/node-server";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
@@ -12,7 +12,10 @@ import { resolveDestination, type VisitorContext } from "./routing.js";
 import { composeDestinationUrl } from "../../../packages/shared/src/utm.js";
 import { GeneratedSlugUnavailableError, insertWithGeneratedSlug, isSlugUniqueConflictError } from "./slug.js";
 
-const app = new Hono<{ Variables: { userId: string; tokenScopes: string[]; sessionAuth: boolean } }>();
+type WorkspaceRole = "owner" | "member";
+type WorkspaceContext = { id: string; ownerUserId: string; name: string; role: WorkspaceRole };
+type ApiEnv = { Variables: { userId: string; tokenScopes: string[]; sessionAuth: boolean; workspaceId: string; workspaceOwnerId: string; workspaceName: string; workspaceRole: WorkspaceRole } };
+const app = new Hono<ApiEnv>();
 const port = Number(process.env.PORT ?? 8787);
 const SESSION_DAYS = 30;
 const sessionCookie = "redirect_hub_session";
@@ -34,6 +37,44 @@ const createTokenSchema = z.object({ name: z.string().trim().min(1).max(60), sco
 const linkTagsSchema = z.object({ tags: z.array(z.string().trim().min(1).max(160)).max(20) });
 
 const ruleOrderSchema = z.object({ direction: z.enum(["up", "down"]) });
+const redeemInvitationSchema = z.object({
+  secret: z.string().regex(/^[A-Za-z0-9_-]{40,100}$/),
+  email: z.string().trim().max(254).pipe(z.email()),
+  password: z.string().min(12).max(128),
+});
+
+function getWorkspaceContext(userId: string, requestedId?: string): WorkspaceContext | undefined {
+  const workspace = requestedId
+    ? db.prepare(`SELECT workspaces.id, workspaces.owner_user_id AS ownerUserId, workspaces.name, workspace_memberships.role
+        FROM workspace_memberships JOIN workspaces ON workspaces.id = workspace_memberships.workspace_id
+        WHERE workspace_memberships.user_id = ? AND workspaces.id = ?`).get(userId, requestedId) as WorkspaceContext | undefined
+    : db.prepare(`SELECT workspaces.id, workspaces.owner_user_id AS ownerUserId, workspaces.name, workspace_memberships.role
+        FROM workspace_memberships JOIN workspaces ON workspaces.id = workspace_memberships.workspace_id
+        WHERE workspace_memberships.user_id = ? AND workspaces.owner_user_id = ?`).get(userId, userId) as WorkspaceContext | undefined;
+  return workspace;
+}
+
+function getUserWorkspaces(userId: string) {
+  return db.prepare(`SELECT workspaces.id, workspaces.name, workspace_memberships.role,
+      workspaces.owner_user_id = workspace_memberships.user_id AS isPersonal
+    FROM workspace_memberships JOIN workspaces ON workspaces.id = workspace_memberships.workspace_id
+    WHERE workspace_memberships.user_id = ?
+    ORDER BY isPersonal DESC, workspaces.name COLLATE NOCASE, workspaces.id`).all(userId) as Array<{ id: string; name: string; role: WorkspaceRole; isPersonal: number }>;
+}
+
+function createPrivateWorkspace(userId: string, email: string, createdAt: string): string {
+  const existing = db.prepare("SELECT id FROM workspaces WHERE owner_user_id = ?").get(userId) as { id: string } | undefined;
+  if (existing) return existing.id;
+  const id = randomUUID();
+  const label = email.split("@")[0] || "My";
+  db.prepare("INSERT INTO workspaces (id, owner_user_id, name, created_at) VALUES (?, ?, ?, ?)").run(id, userId, `${label}'s workspace`, createdAt);
+  db.prepare("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at) VALUES (?, ?, 'owner', ?)").run(id, userId, createdAt);
+  return id;
+}
+
+function genericInvitationFailure(c: Context<ApiEnv>) {
+  return c.json({ error: "This invitation could not be redeemed. Check the link and try again." }, 400);
+}
 
 function getPublicBaseUrl(requestUrl: string) {
   return configuredPublicBase?.origin ?? new URL(requestUrl).origin;
@@ -73,12 +114,16 @@ async function hashPassword(password: string, salt: string) {
   return (await scryptAsync(password, salt, 64)) as Buffer;
 }
 
-function startSession(c: Parameters<typeof setCookie>[0], userId: string) {
+function createSessionRecord(userId: string) {
   const token = randomBytes(32).toString("base64url");
   const id = randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 86_400_000).toISOString();
   db.prepare("DELETE FROM sessions WHERE user_id = ? AND expires_at <= ?").run(userId, new Date().toISOString());
   db.prepare("INSERT INTO sessions (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)").run(id, userId, hashSessionToken(token), expiresAt);
+  return { token, expiresAt };
+}
+
+function setSessionCookie(c: Parameters<typeof setCookie>[0], token: string) {
   setCookie(c, sessionCookie, token, {
     httpOnly: true,
     sameSite: "Lax",
@@ -86,6 +131,11 @@ function startSession(c: Parameters<typeof setCookie>[0], userId: string) {
     path: "/",
     maxAge: SESSION_DAYS * 86_400,
   });
+}
+
+function startSession(c: Parameters<typeof setCookie>[0], userId: string) {
+  const session = createSessionRecord(userId);
+  setSessionCookie(c, session.token);
 }
 
 function getSessionUser(token: string | undefined) {
@@ -104,12 +154,18 @@ function getSessionUser(token: string | undefined) {
 }
 
 app.use("/api/*", async (c, next) => {
-  if (c.req.path.startsWith("/api/auth/") || c.req.path === "/api/health") return next();
+  if (c.req.path.startsWith("/api/auth/") || c.req.path === "/api/health" || c.req.path === "/api/invitations/redeem") return next();
   const user = getSessionUser(getCookie(c, sessionCookie));
   if (user) {
     c.set("userId", user.id);
     c.set("tokenScopes", ["read", "write"]);
     c.set("sessionAuth", true);
+    const workspace = getWorkspaceContext(user.id, c.req.header("x-workspace-id")?.trim() || undefined);
+    if (!workspace) return c.json({ error: "This workspace is unavailable to your account." }, 404);
+    c.set("workspaceId", workspace.id);
+    c.set("workspaceOwnerId", workspace.ownerUserId);
+    c.set("workspaceName", workspace.name);
+    c.set("workspaceRole", workspace.role);
     return next();
   }
   const bearer = c.req.header("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1];
@@ -123,13 +179,122 @@ app.use("/api/*", async (c, next) => {
   c.set("userId", token.user_id);
   c.set("tokenScopes", token.scopes.split(","));
   c.set("sessionAuth", false);
+  const workspace = getWorkspaceContext(token.user_id);
+  if (!workspace) return c.json({ error: "This account has no personal workspace." }, 403);
+  if (c.req.header("x-workspace-id") && c.req.header("x-workspace-id") !== workspace.id) {
+    return c.json({ error: "API tokens cannot access a shared workspace." }, 403);
+  }
+  c.set("workspaceId", workspace.id);
+  c.set("workspaceOwnerId", workspace.ownerUserId);
+  c.set("workspaceName", workspace.name);
+  c.set("workspaceRole", workspace.role);
   await next();
 });
 
 app.get("/api/auth/session", (c) => {
   const user = getSessionUser(getCookie(c, sessionCookie));
   const configured = Boolean(db.prepare("SELECT 1 FROM users LIMIT 1").get());
-  return c.json({ user: user ? { id: user.id, email: user.email } : null, configured });
+  return c.json({ user: user ? { id: user.id, email: user.email } : null, workspaces: user ? getUserWorkspaces(user.id) : [], configured });
+});
+
+app.post("/api/workspaces/:workspaceId/invitations", async (c) => {
+  const workspaceId = c.req.param("workspaceId");
+  if (!c.get("sessionAuth") || c.get("workspaceRole") !== "owner" || c.get("workspaceId") !== workspaceId) {
+    return c.json({ error: "Only a signed-in workspace owner can create invitations." }, 403);
+  }
+  const secret = randomBytes(32).toString("base64url");
+  const createdAt = new Date();
+  const expiresAt = new Date(createdAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const id = randomUUID();
+  db.prepare(`INSERT INTO workspace_invitations
+    (id, workspace_id, created_by_user_id, secret_hash, created_at, expires_at)
+    VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(id, workspaceId, c.get("userId"), createHash("sha256").update(secret).digest("hex"), createdAt.toISOString(), expiresAt.toISOString());
+  const url = `${getPublicBaseUrl(c.req.url)}/#/redeem?invitation=${encodeURIComponent(secret)}`;
+  return c.json({ invitation: { id, url, createdAt: createdAt.toISOString(), expiresAt: expiresAt.toISOString() } }, 201);
+});
+
+app.get("/api/workspaces/:workspaceId/invitations", (c) => {
+  const workspaceId = c.req.param("workspaceId");
+  if (!c.get("sessionAuth") || c.get("workspaceRole") !== "owner" || c.get("workspaceId") !== workspaceId) {
+    return c.json({ error: "Only a signed-in workspace owner can view invitations." }, 403);
+  }
+  const invitations = db.prepare(`SELECT id, created_by_user_id AS createdByUserId, created_at AS createdAt,
+      expires_at AS expiresAt, redeemed_at AS redeemedAt, revoked_at AS revokedAt
+    FROM workspace_invitations WHERE workspace_id = ? ORDER BY created_at DESC, id`).all(workspaceId);
+  return c.json({ invitations });
+});
+
+app.delete("/api/workspaces/:workspaceId/invitations/:invitationId", (c) => {
+  const workspaceId = c.req.param("workspaceId");
+  if (!c.get("sessionAuth") || c.get("workspaceRole") !== "owner" || c.get("workspaceId") !== workspaceId) {
+    return c.json({ error: "Only a signed-in workspace owner can revoke invitations." }, 403);
+  }
+  const revokedAt = new Date().toISOString();
+  const result = db.prepare(`UPDATE workspace_invitations SET revoked_at = ?
+    WHERE id = ? AND workspace_id = ? AND redeemed_at IS NULL AND revoked_at IS NULL`)
+    .run(revokedAt, c.req.param("invitationId"), workspaceId);
+  if (!result.changes) return c.json({ error: "Unused invitation not found." }, 404);
+  return c.json({ ok: true });
+});
+
+app.post("/api/invitations/redeem", async (c) => {
+  const parsed = redeemInvitationSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return genericInvitationFailure(c);
+  const secretHash = createHash("sha256").update(parsed.data.secret).digest("hex");
+  const now = new Date().toISOString();
+  const invitation = db.prepare(`SELECT id, workspace_id AS workspaceId FROM workspace_invitations
+    WHERE secret_hash = ? AND redeemed_at IS NULL AND revoked_at IS NULL AND expires_at > ?`).get(secretHash, now) as { id: string; workspaceId: string } | undefined;
+  if (!invitation) return genericInvitationFailure(c);
+
+  const email = parsed.data.email.trim().toLowerCase();
+  const userId = randomUUID();
+  const salt = randomBytes(16).toString("hex");
+  const passwordHash = await hashPassword(parsed.data.password, salt);
+  const createdAt = new Date().toISOString();
+  const sessionToken = randomBytes(32).toString("base64url");
+  const sessionId = randomUUID();
+  const sessionExpiresAt = new Date(Date.now() + SESSION_DAYS * 86_400_000).toISOString();
+  let personalWorkspaceId = "";
+  let invitedWorkspace: { id: string; name: string } | undefined;
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const active = db.prepare(`SELECT id, workspace_id AS workspaceId FROM workspace_invitations
+      WHERE id = ? AND secret_hash = ? AND redeemed_at IS NULL AND revoked_at IS NULL AND expires_at > ?`)
+      .get(invitation.id, secretHash, new Date().toISOString()) as { id: string; workspaceId: string } | undefined;
+    if (!active) { db.exec("ROLLBACK"); return genericInvitationFailure(c); }
+    if (db.prepare("SELECT 1 FROM users WHERE email = ? COLLATE NOCASE").get(email)) {
+      db.exec("ROLLBACK");
+      return genericInvitationFailure(c);
+    }
+    const workspace = db.prepare("SELECT id, name FROM workspaces WHERE id = ?").get(active.workspaceId) as { id: string; name: string } | undefined;
+    if (!workspace) { db.exec("ROLLBACK"); return genericInvitationFailure(c); }
+    invitedWorkspace = workspace;
+    db.prepare("INSERT INTO users (id, email, password_salt, password_hash, created_at) VALUES (?, ?, ?, ?, ?)")
+      .run(userId, email, salt, passwordHash.toString("hex"), createdAt);
+    personalWorkspaceId = createPrivateWorkspace(userId, email, createdAt);
+    db.prepare("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at) VALUES (?, ?, 'member', ?)")
+      .run(active.workspaceId, userId, createdAt);
+    const consumed = db.prepare(`UPDATE workspace_invitations SET redeemed_at = ?
+      WHERE id = ? AND secret_hash = ? AND redeemed_at IS NULL AND revoked_at IS NULL AND expires_at > ?`)
+      .run(createdAt, active.id, secretHash, createdAt);
+    if (consumed.changes !== 1) throw new Error("Invitation redemption lost the single-use race.");
+    db.prepare("DELETE FROM sessions WHERE user_id = ? AND expires_at <= ?").run(userId, createdAt);
+    db.prepare("INSERT INTO sessions (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)")
+      .run(sessionId, userId, hashSessionToken(sessionToken), sessionExpiresAt);
+    db.exec("COMMIT");
+  } catch (error) {
+    if (db.isTransaction) db.exec("ROLLBACK");
+    if (error instanceof Error && error.message.includes("UNIQUE constraint failed")) return genericInvitationFailure(c);
+    if (error instanceof Error && error.message.includes("Invitation redemption lost")) return genericInvitationFailure(c);
+    throw error;
+  }
+  setSessionCookie(c, sessionToken);
+  return c.json({
+    user: { id: userId, email },
+    personalWorkspaceId,
+    workspace: { id: invitedWorkspace!.id, name: invitedWorkspace!.name, role: "member" as const },
+  }, 201);
 });
 
 app.post("/api/auth/register", async (c) => {
@@ -144,8 +309,10 @@ app.post("/api/auth/register", async (c) => {
     const hasExistingAccounts = Boolean(db.prepare("SELECT 1 FROM users LIMIT 1").get());
     db.prepare("INSERT INTO users (id, email, password_salt, password_hash) VALUES (?, ?, ?, ?)")
       .run(userId, input.data.email.trim().toLowerCase(), salt, passwordHash.toString("hex"));
+    const createdAt = new Date().toISOString();
+    const workspaceId = createPrivateWorkspace(userId, input.data.email.trim().toLowerCase(), createdAt);
     if (!hasExistingAccounts) {
-      db.prepare("UPDATE links SET owner_id = ? WHERE owner_id IS NULL").run(userId);
+      db.prepare("UPDATE links SET owner_id = ?, workspace_id = ? WHERE owner_id IS NULL").run(userId, workspaceId);
     }
     db.exec("COMMIT");
   } catch (error) {
@@ -184,6 +351,8 @@ app.post("/api/auth/logout", (c) => {
 app.get("/api/auth/tokens", (c) => {
   const user = getSessionUser(getCookie(c, sessionCookie));
   if (!user) return c.json({ error: "Sign in to manage API tokens." }, 401);
+  const workspace = getWorkspaceContext(user.id, c.req.header("x-workspace-id")?.trim() || undefined);
+  if (!workspace || workspace.role !== "owner") return c.json({ error: "API tokens are available only in your personal owner workspace." }, 403);
   const tokens = db.prepare("SELECT id, name, scopes, created_at AS createdAt, last_used_at AS lastUsedAt FROM api_tokens WHERE user_id = ? AND revoked_at IS NULL ORDER BY created_at DESC").all(user.id);
   return c.json({ tokens });
 });
@@ -191,6 +360,8 @@ app.get("/api/auth/tokens", (c) => {
 app.post("/api/auth/tokens", async (c) => {
   const user = getSessionUser(getCookie(c, sessionCookie));
   if (!user) return c.json({ error: "Sign in to create API tokens." }, 401);
+  const workspace = getWorkspaceContext(user.id, c.req.header("x-workspace-id")?.trim() || undefined);
+  if (!workspace || workspace.role !== "owner") return c.json({ error: "API tokens are available only in your personal owner workspace." }, 403);
   const parsed = createTokenSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Provide a token name and choose read or read/write access." }, 400);
   const count = (db.prepare("SELECT COUNT(*) AS count FROM api_tokens WHERE user_id = ? AND revoked_at IS NULL").get(user.id) as { count: number }).count;
@@ -205,6 +376,8 @@ app.post("/api/auth/tokens", async (c) => {
 app.delete("/api/auth/tokens/:id", (c) => {
   const user = getSessionUser(getCookie(c, sessionCookie));
   if (!user) return c.json({ error: "Sign in to revoke API tokens." }, 401);
+  const workspace = getWorkspaceContext(user.id, c.req.header("x-workspace-id")?.trim() || undefined);
+  if (!workspace || workspace.role !== "owner") return c.json({ error: "API tokens are available only in your personal owner workspace." }, 403);
   const result = db.prepare("UPDATE api_tokens SET revoked_at = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL")
     .run(new Date().toISOString(), c.req.param("id"), user.id);
   if (result.changes === 0) return c.json({ error: "Token not found." }, 404);
@@ -239,7 +412,8 @@ function serialize(link: LinkRecord, baseUrl: string) {
 app.get("/api/health", (c) => c.json({ status: "ok" }));
 
 app.get("/api/links", (c) => {
-  const ownerId = c.get("userId");
+  const ownerId = c.get("workspaceOwnerId");
+  const workspaceId = c.get("workspaceId");
   const archiveMode = c.req.query("archive") ?? "active";
   if (!(["active", "archived", "all"] as const).includes(archiveMode as "active" | "archived" | "all")) {
     return c.json({ error: "Choose active, archived, or all links." }, 400);
@@ -249,38 +423,40 @@ app.get("/api/links", (c) => {
   const archiveClause = archiveMode === "active" ? "links.archived_at IS NULL" : archiveMode === "archived" ? "links.archived_at IS NOT NULL" : "1 = 1";
   const searchClause = search ? "AND (instr(lower(links.name), lower(?)) > 0 OR instr(lower(links.slug), lower(?)) > 0 OR instr(lower(links.destination_url), lower(?)) > 0)" : "";
   const tagClause = tagId ? "AND EXISTS (SELECT 1 FROM link_tags WHERE link_tags.link_id = links.id AND link_tags.owner_id = links.owner_id AND link_tags.tag_id = ? AND link_tags.owner_id = ?)" : "";
-  const params: Array<string> = [ownerId];
+  const params: Array<string> = [workspaceId];
   if (search) params.push(search, search, search);
   if (tagId) params.push(tagId, ownerId);
   const rows = db.prepare(`SELECT links.*, SUM(CASE WHEN click_events.is_bot = 0 THEN 1 ELSE 0 END) AS click_count
     FROM links LEFT JOIN click_events ON click_events.link_id = links.id
-    WHERE links.owner_id = ? AND ${archiveClause} ${searchClause} ${tagClause}
+    WHERE links.workspace_id = ? AND ${archiveClause} ${searchClause} ${tagClause}
     GROUP BY links.id ORDER BY links.created_at DESC, links.rowid DESC`).all(...params) as unknown as LinkRecord[];
   return c.json({ links: rows.map((row) => serialize(row, getPublicBaseUrl(c.req.url))) });
 });
 
 app.get("/api/tags", (c) => {
+  const ownerId = c.get("workspaceOwnerId");
   const tags = db.prepare(`SELECT tags.id, tags.name, COUNT(link_tags.link_id) AS linkCount
     FROM tags LEFT JOIN link_tags ON link_tags.tag_id = tags.id AND link_tags.owner_id = tags.owner_id
-    WHERE tags.owner_id = ? GROUP BY tags.id ORDER BY tags.normalized_name`).all(c.get("userId"));
+    WHERE tags.owner_id = ? GROUP BY tags.id ORDER BY tags.normalized_name`).all(ownerId);
   return c.json({ tags });
 });
 
 app.get("/api/analytics", (c) => {
-  const ownerId = c.get("userId");
-  const where = `FROM click_events JOIN links ON links.id = click_events.link_id WHERE links.owner_id = ? AND click_events.is_bot = 0`;
-  const summary = db.prepare(`SELECT COUNT(*) AS total, SUM(CASE WHEN julianday(click_events.clicked_at) >= julianday('now', '-7 days') THEN 1 ELSE 0 END) AS last_seven_days ${where}`).get(ownerId) as { total: number; last_seven_days: number | null };
-  const devices = db.prepare(`SELECT click_events.device, COUNT(*) AS clicks ${where} GROUP BY click_events.device ORDER BY clicks DESC`).all(ownerId);
-  const topLinks = db.prepare(`SELECT links.id, links.name, links.slug, COUNT(*) AS clicks ${where} GROUP BY links.id ORDER BY clicks DESC LIMIT 5`).all(ownerId);
-  const countries = db.prepare(`SELECT click_events.country_code AS countryCode, COUNT(*) AS clicks ${where} AND click_events.country_code IS NOT NULL GROUP BY click_events.country_code ORDER BY clicks DESC LIMIT 10`).all(ownerId);
+  const workspaceId = c.get("workspaceId");
+  const where = `FROM click_events JOIN links ON links.id = click_events.link_id WHERE links.workspace_id = ? AND click_events.is_bot = 0`;
+  const summary = db.prepare(`SELECT COUNT(*) AS total, SUM(CASE WHEN julianday(click_events.clicked_at) >= julianday('now', '-7 days') THEN 1 ELSE 0 END) AS last_seven_days ${where}`).get(workspaceId) as { total: number; last_seven_days: number | null };
+  const devices = db.prepare(`SELECT click_events.device, COUNT(*) AS clicks ${where} GROUP BY click_events.device ORDER BY clicks DESC`).all(workspaceId);
+  const topLinks = db.prepare(`SELECT links.id, links.name, links.slug, COUNT(*) AS clicks ${where} GROUP BY links.id ORDER BY clicks DESC LIMIT 5`).all(workspaceId);
+  const countries = db.prepare(`SELECT click_events.country_code AS countryCode, COUNT(*) AS clicks ${where} AND click_events.country_code IS NOT NULL GROUP BY click_events.country_code ORDER BY clicks DESC LIMIT 10`).all(workspaceId);
   const rules = db.prepare(`SELECT click_events.matched_rule_id AS ruleId, redirect_rules.priority, redirect_rules.country_code AS countryCode, redirect_rules.device, redirect_rules.destination_url AS destinationUrl, links.name AS linkName, links.slug, COUNT(*) AS clicks
     FROM click_events JOIN links ON links.id = click_events.link_id JOIN redirect_rules ON redirect_rules.id = click_events.matched_rule_id
-    WHERE links.owner_id = ? AND click_events.is_bot = 0 AND click_events.matched_rule_id IS NOT NULL
-    GROUP BY click_events.matched_rule_id ORDER BY clicks DESC LIMIT 10`).all(ownerId);
+    WHERE links.workspace_id = ? AND click_events.is_bot = 0 AND click_events.matched_rule_id IS NOT NULL
+    GROUP BY click_events.matched_rule_id ORDER BY clicks DESC LIMIT 10`).all(workspaceId);
   return c.json({ totalClicks: summary.total, lastSevenDays: summary.last_seven_days ?? 0, devices, countries, rules, topLinks, tracking: "bot-filtered; no raw IP or full user-agent is stored" });
 });
 
 app.post("/api/links", async (c) => {
+  if (c.get("workspaceRole") !== "owner") return c.json({ error: "This workspace is read-only for your account." }, 403);
   const body = await c.req.json().catch(() => null);
   const parsed = createLinkSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: "Check the link details and try again.", issues: parsed.error.flatten().fieldErrors }, 400);
@@ -297,6 +473,7 @@ app.post("/api/links", async (c) => {
   const link: LinkRecord = {
     id: randomUUID(),
     owner_id: c.get("userId"),
+    workspace_id: c.get("workspaceId"),
     slug,
     name: input.name,
     destination_url: input.destinationUrl,
@@ -309,9 +486,9 @@ app.post("/api/links", async (c) => {
     modified_at: createdAt,
     archived_at: null,
   };
-  const insertLink = db.prepare("INSERT INTO links (id, owner_id, slug, name, destination_url, utm_source, utm_medium, utm_campaign, utm_term, utm_content, created_at, modified_at, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)");
+  const insertLink = db.prepare("INSERT INTO links (id, owner_id, workspace_id, slug, name, destination_url, utm_source, utm_medium, utm_campaign, utm_term, utm_content, created_at, modified_at, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)");
   if (input.slug) {
-    try { insertLink.run(link.id, link.owner_id, input.slug, link.name, link.destination_url, link.utm_source, link.utm_medium, link.utm_campaign, link.utm_term, link.utm_content, createdAt, createdAt); }
+    try { insertLink.run(link.id, link.owner_id, link.workspace_id, input.slug, link.name, link.destination_url, link.utm_source, link.utm_medium, link.utm_campaign, link.utm_term, link.utm_content, createdAt, createdAt); }
     catch (error) {
       if (isSlugUniqueConflictError(error)) return c.json({ error: "That short code is already in use." }, 409);
       throw error;
@@ -319,7 +496,7 @@ app.post("/api/links", async (c) => {
     link.slug = input.slug;
   } else {
     try {
-      const generated = insertWithGeneratedSlug((candidate) => insertLink.run(link.id, link.owner_id, candidate, link.name, link.destination_url, link.utm_source, link.utm_medium, link.utm_campaign, link.utm_term, link.utm_content, createdAt, createdAt));
+      const generated = insertWithGeneratedSlug((candidate) => insertLink.run(link.id, link.owner_id, link.workspace_id, candidate, link.name, link.destination_url, link.utm_source, link.utm_medium, link.utm_campaign, link.utm_term, link.utm_content, createdAt, createdAt));
       link.slug = generated.slug;
     } catch (error) {
       if (error instanceof GeneratedSlugUnavailableError) return c.json({ error: error.message }, 503);
@@ -331,9 +508,10 @@ app.post("/api/links", async (c) => {
 });
 
 app.patch("/api/links/:id", async (c) => {
+  if (c.get("workspaceRole") !== "owner") return c.json({ error: "This workspace is read-only for your account." }, 403);
   const parsed = updateLinkSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Provide valid link details and UTM values.", issues: parsed.error.flatten().fieldErrors }, 400);
-  const existing = db.prepare("SELECT id, slug FROM links WHERE id = ? AND owner_id = ?").get(c.req.param("id"), c.get("userId")) as { id: string; slug: string } | undefined;
+  const existing = db.prepare("SELECT id, slug FROM links WHERE id = ? AND workspace_id = ?").get(c.req.param("id"), c.get("workspaceId")) as { id: string; slug: string } | undefined;
   if (!existing) return c.json({ error: "Link not found." }, 404);
   if (parsed.data.destinationUrl && pointsToOwnShortUrl(parsed.data.destinationUrl, existing.slug, c.req.url)) {
     return c.json({ error: "A short link cannot redirect to itself." }, 400);
@@ -347,10 +525,10 @@ app.patch("/api/links/:id", async (c) => {
     if (parsed.data[field] !== undefined) { assignments.push(`${column} = ?`); values.push(parsed.data[field] || null); }
   }
   assignments.push("modified_at = ?"); values.push(new Date().toISOString());
-  values.push(c.req.param("id"), c.get("userId"));
-  db.prepare(`UPDATE links SET ${assignments.join(", ")} WHERE id = ? AND owner_id = ?`).run(...values);
+  values.push(c.req.param("id"), c.get("workspaceId"));
+  db.prepare(`UPDATE links SET ${assignments.join(", ")} WHERE id = ? AND workspace_id = ?`).run(...values);
 
-  const updated = db.prepare("SELECT * FROM links WHERE id = ? AND owner_id = ?").get(c.req.param("id"), c.get("userId")) as unknown as LinkRecord;
+  const updated = db.prepare("SELECT * FROM links WHERE id = ? AND workspace_id = ?").get(c.req.param("id"), c.get("workspaceId")) as unknown as LinkRecord;
   return c.json({ link: serialize(updated, getPublicBaseUrl(c.req.url)) });
 });
 
@@ -361,9 +539,11 @@ function cleanTagName(value: string) {
 }
 
 app.put("/api/links/:id/tags", async (c) => {
+  if (c.get("workspaceRole") !== "owner") return c.json({ error: "This workspace is read-only for your account." }, 403);
   const linkId = c.req.param("id");
-  const ownerId = c.get("userId");
-  const link = getOwnedLink(linkId, ownerId);
+  const ownerId = c.get("workspaceOwnerId");
+  const workspaceId = c.get("workspaceId");
+  const link = getOwnedLink(linkId, workspaceId);
   if (!link) return c.json({ error: "Link not found." }, 404);
   const parsed = linkTagsSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Provide up to 20 tag names, each 1–40 characters." }, 400);
@@ -392,43 +572,47 @@ app.put("/api/links/:id/tags", async (c) => {
     if (db.isTransaction) db.exec("ROLLBACK");
     throw error;
   }
-  const updated = getOwnedLink(linkId, ownerId)!;
+  const updated = getOwnedLink(linkId, workspaceId)!;
   return c.json({ link: serialize(updated, getPublicBaseUrl(c.req.url)) });
 });
 
 app.post("/api/links/:id/archive", (c) => {
-  const ownerId = c.get("userId");
+  if (c.get("workspaceRole") !== "owner") return c.json({ error: "This workspace is read-only for your account." }, 403);
+  const workspaceId = c.get("workspaceId");
   const linkId = c.req.param("id");
-  const result = db.prepare("UPDATE links SET archived_at = COALESCE(archived_at, ?), modified_at = ? WHERE id = ? AND owner_id = ?")
-    .run(new Date().toISOString(), new Date().toISOString(), linkId, ownerId);
+  const result = db.prepare("UPDATE links SET archived_at = COALESCE(archived_at, ?), modified_at = ? WHERE id = ? AND workspace_id = ?")
+    .run(new Date().toISOString(), new Date().toISOString(), linkId, workspaceId);
   if (!result.changes) return c.json({ error: "Link not found." }, 404);
-  return c.json({ link: serialize(getOwnedLink(linkId, ownerId)!, getPublicBaseUrl(c.req.url)) });
+  return c.json({ link: serialize(getOwnedLink(linkId, workspaceId)!, getPublicBaseUrl(c.req.url)) });
 });
 
 app.post("/api/links/:id/unarchive", (c) => {
-  const ownerId = c.get("userId");
+  if (c.get("workspaceRole") !== "owner") return c.json({ error: "This workspace is read-only for your account." }, 403);
+  const workspaceId = c.get("workspaceId");
   const linkId = c.req.param("id");
-  const result = db.prepare("UPDATE links SET archived_at = NULL, modified_at = ? WHERE id = ? AND owner_id = ?")
-    .run(new Date().toISOString(), linkId, ownerId);
+  const result = db.prepare("UPDATE links SET archived_at = NULL, modified_at = ? WHERE id = ? AND workspace_id = ?")
+    .run(new Date().toISOString(), linkId, workspaceId);
   if (!result.changes) return c.json({ error: "Link not found." }, 404);
-  return c.json({ link: serialize(getOwnedLink(linkId, ownerId)!, getPublicBaseUrl(c.req.url)) });
+  return c.json({ link: serialize(getOwnedLink(linkId, workspaceId)!, getPublicBaseUrl(c.req.url)) });
 });
 
 app.post("/api/links/:id/duplicate", (c) => {
-  const ownerId = c.get("userId");
-  const source = getOwnedLink(c.req.param("id"), ownerId);
+  if (c.get("workspaceRole") !== "owner") return c.json({ error: "This workspace is read-only for your account." }, 403);
+  const ownerId = c.get("workspaceOwnerId");
+  const workspaceId = c.get("workspaceId");
+  const source = getOwnedLink(c.req.param("id"), workspaceId);
   if (!source) return c.json({ error: "Link not found." }, 404);
   const createdAt = new Date().toISOString();
   const newLink: Omit<LinkRecord, "slug"> & { slug: string } = {
-    id: randomUUID(), owner_id: ownerId, slug: "", name: source.name,
+    id: randomUUID(), owner_id: ownerId, workspace_id: workspaceId, slug: "", name: source.name,
     destination_url: source.destination_url, utm_source: source.utm_source, utm_medium: source.utm_medium,
     utm_campaign: source.utm_campaign, utm_term: source.utm_term, utm_content: source.utm_content, created_at: createdAt,
     modified_at: createdAt, archived_at: null,
   };
   db.exec("BEGIN IMMEDIATE");
   try {
-    const insertLink = db.prepare("INSERT INTO links (id, owner_id, slug, name, destination_url, utm_source, utm_medium, utm_campaign, utm_term, utm_content, created_at, modified_at, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)");
-    const generated = insertWithGeneratedSlug((slug) => insertLink.run(newLink.id, ownerId, slug, newLink.name, newLink.destination_url, newLink.utm_source, newLink.utm_medium, newLink.utm_campaign, newLink.utm_term, newLink.utm_content, createdAt, createdAt));
+    const insertLink = db.prepare("INSERT INTO links (id, owner_id, workspace_id, slug, name, destination_url, utm_source, utm_medium, utm_campaign, utm_term, utm_content, created_at, modified_at, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)");
+    const generated = insertWithGeneratedSlug((slug) => insertLink.run(newLink.id, ownerId, workspaceId, slug, newLink.name, newLink.destination_url, newLink.utm_source, newLink.utm_medium, newLink.utm_campaign, newLink.utm_term, newLink.utm_content, createdAt, createdAt));
     newLink.slug = generated.slug;
     const sourceTags = db.prepare("SELECT tag_id FROM link_tags WHERE link_id = ? AND owner_id = ?").all(source.id, ownerId) as Array<{ tag_id: string }>;
     const attachTag = db.prepare("INSERT INTO link_tags (link_id, tag_id, owner_id) VALUES (?, ?, ?)");
@@ -442,23 +626,30 @@ app.post("/api/links/:id/duplicate", (c) => {
     if (error instanceof GeneratedSlugUnavailableError) return c.json({ error: error.message }, 503);
     throw error;
   }
-  return c.json({ link: serialize(getOwnedLink(newLink.id, ownerId)!, getPublicBaseUrl(c.req.url)) }, 201);
+  return c.json({ link: serialize(getOwnedLink(newLink.id, workspaceId)!, getPublicBaseUrl(c.req.url)) }, 201);
 });
 
-function getOwnedLink(linkId: string, ownerId: string) {
-  return db.prepare("SELECT * FROM links WHERE id = ? AND owner_id = ?").get(linkId, ownerId) as LinkRecord | undefined;
+function getOwnedLink(linkId: string, workspaceId: string) {
+  return db.prepare("SELECT * FROM links WHERE id = ? AND workspace_id = ?").get(linkId, workspaceId) as LinkRecord | undefined;
 }
 
+app.get("/api/links/:id", (c) => {
+  const link = getOwnedLink(c.req.param("id"), c.get("workspaceId"));
+  if (!link) return c.json({ error: "Link not found." }, 404);
+  return c.json({ link: serialize(link, getPublicBaseUrl(c.req.url)) });
+});
+
 app.get("/api/links/:id/rules", (c) => {
-  if (!getOwnedLink(c.req.param("id"), c.get("userId"))) return c.json({ error: "Link not found." }, 404);
+  if (!getOwnedLink(c.req.param("id"), c.get("workspaceId"))) return c.json({ error: "Link not found." }, 404);
   const rules = db.prepare("SELECT id, priority, country_code AS countryCode, device, destination_url AS destinationUrl, created_at AS createdAt FROM redirect_rules WHERE link_id = ? ORDER BY priority, created_at, id")
     .all(c.req.param("id"));
   return c.json({ rules, maxRules: 20 });
 });
 
 app.post("/api/links/:id/rules", async (c) => {
+  if (c.get("workspaceRole") !== "owner") return c.json({ error: "This workspace is read-only for your account." }, 403);
   const linkId = c.req.param("id");
-  const link = getOwnedLink(linkId, c.get("userId"));
+  const link = getOwnedLink(linkId, c.get("workspaceId"));
   if (!link) return c.json({ error: "Link not found." }, 404);
   const parsed = createRuleSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Add a valid HTTP(S) destination and at least one country or device condition.", issues: parsed.error.flatten().fieldErrors }, 400);
@@ -475,8 +666,9 @@ app.post("/api/links/:id/rules", async (c) => {
 });
 
 app.delete("/api/links/:id/rules/:ruleId", (c) => {
+  if (c.get("workspaceRole") !== "owner") return c.json({ error: "This workspace is read-only for your account." }, 403);
   const linkId = c.req.param("id");
-  if (!getOwnedLink(linkId, c.get("userId"))) return c.json({ error: "Link not found." }, 404);
+  if (!getOwnedLink(linkId, c.get("workspaceId"))) return c.json({ error: "Link not found." }, 404);
   const exists = db.prepare("SELECT 1 FROM redirect_rules WHERE id = ? AND link_id = ?").get(c.req.param("ruleId"), linkId);
   if (!exists) return c.json({ error: "Rule not found." }, 404);
   db.exec("BEGIN IMMEDIATE");
@@ -492,8 +684,9 @@ app.delete("/api/links/:id/rules/:ruleId", (c) => {
 });
 
 app.patch("/api/links/:id/rules/:ruleId/priority", async (c) => {
+  if (c.get("workspaceRole") !== "owner") return c.json({ error: "This workspace is read-only for your account." }, 403);
   const linkId = c.req.param("id");
-  if (!getOwnedLink(linkId, c.get("userId"))) return c.json({ error: "Link not found." }, 404);
+  if (!getOwnedLink(linkId, c.get("workspaceId"))) return c.json({ error: "Link not found." }, 404);
   const parsed = ruleOrderSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Choose whether to move this rule up or down." }, 400);
   db.exec("BEGIN IMMEDIATE");
@@ -515,7 +708,7 @@ app.patch("/api/links/:id/rules/:ruleId/priority", async (c) => {
 });
 
 app.post("/api/links/:id/simulate", async (c) => {
-  const link = getOwnedLink(c.req.param("id"), c.get("userId"));
+  const link = getOwnedLink(c.req.param("id"), c.get("workspaceId"));
   if (!link) return c.json({ error: "Link not found." }, 404);
   const parsed = visitorSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Use a two-letter country code and a supported device value." }, 400);

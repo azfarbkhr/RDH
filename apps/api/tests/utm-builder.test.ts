@@ -18,6 +18,9 @@ test("UTM values persist per owner, compose identically for preview contract/sim
   for (const id of ["utm-owner", "utm-other"]) {
     db.prepare("INSERT INTO users (id, email, password_salt, password_hash) VALUES (?, ?, ?, ?)")
       .run(id, `${id}@example.test`, "salt", "hash");
+    const workspaceId = `workspace-${id}`;
+    db.prepare("INSERT INTO workspaces (id, owner_user_id, name) VALUES (?, ?, ?)").run(workspaceId, id, `${id} workspace`);
+    db.prepare("INSERT INTO workspace_memberships (workspace_id, user_id, role) VALUES (?, ?, 'owner')").run(workspaceId, id);
   }
   const cookieFor = (ownerId: string) => {
     const token = randomBytes(32).toString("base64url");

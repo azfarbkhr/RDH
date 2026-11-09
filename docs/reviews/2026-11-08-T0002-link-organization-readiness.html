@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>T-0002 requirements readiness review | Redirect Hub</title><link rel="stylesheet" href="../assets/site.css"><script src="../assets/menu.js" defer></script></head><body><main>
+<h1>T-0002 requirements readiness review</h1>
+<p><strong>Deliverable:</strong> Requirements readiness review. <strong>Candidate:</strong> ticket HTML SHA-256 <code>A293EA01D9347FD72B87833FD00C543BD216E94648031CC8D3A688B624B0FE5B</code>. <strong>Commit:</strong> none; this is a documentation candidate.</p>
+<p><strong>Workspace/branch:</strong> <code>D:\WorkITAAI\RDH</code>, <code>main</code>. <strong>Review date:</strong> 8 November 2026.</p>
+
+<h2>Verdict: NEEDS-INFO</h2>
+<p>The ticket is detailed and technically grounded, with observable checks for migration, isolation, tags, archiving, duplication, and slug collisions. It is not ready for implementation until the Product Owner selects the link-duplication behavior: whether routing rules are copied. The ticket identifies this question and recommendation explicitly; no corrective grooming defect was found.</p>
+
+<h2>Acceptance-check review</h2>
+<table><thead><tr><th>ID</th><th>Review procedure</th><th>Evidence/result</th><th>Outcome</th></tr></thead><tbody>
+<tr><td>R01 / AC01</td><td>Compare migration requirements against current SQLite schema and startup migrations in <code>apps/api/src/db.ts</code>.</td><td>Current schema contains link identity/owner/slug/name/destination/timestamps, redirect rules, and click events; startup adds owner and modified time where missing. AC01 names the preserved fields and default active state. Its fixture-based verification is feasible. Migration test is not implemented yet, appropriately marked not run.</td><td>PASS</td></tr>
+<tr><td>R02 / AC02–AC03</td><td>Inspect current owner-scoped list/update API, link schema, and search UI; assess tag relation and isolation coverage.</td><td>Current API queries use <code>owner_id</code>; link creation uses a globally unique slug and link edits check ID plus owner. Tags and filters do not exist. AC02–AC03 require trimming, per-owner case-insensitive uniqueness, selected-tag filtering, combined filters, and denial of foreign-owner access. The ticket explicitly requires a relation that enforces owner consistency and uses two synthetic owners because normal registration currently permits one instance account.</td><td>PASS</td></tr>
+<tr><td>R03 / AC04</td><td>Compare archive behavior with public redirect lookup.</td><td>The public redirect currently resolves by slug without an archive field. AC04 explicitly keeps archived rows out of the active list but leaves their short URL and 302 redirect intact. V03 covers before/during/after behavior with a saved rule.</td><td>PASS</td></tr>
+<tr><td>R04 / AC05</td><td>Inspect proposed duplicate content, routing rule model, and click-event relationships.</td><td>The ticket proposes copying name, destination, tags, and routing rules into a new active link with a unique slug, while leaving click events with the source. It also explicitly offers option A (copy routing rules) versus option B (name and destination only) and recommends A. Because the owner has not chosen, the shipped scope remains open.</td><td>NEEDS-INFO</td></tr>
+<tr><td>R05 / AC06</td><td>Inspect current generated/custom slug handling and database uniqueness.</td><td>Current custom collisions return 409 and the database enforces global uniqueness; generated slugs currently use random bytes with a uniqueness precheck and insertion guard. AC06 adds bounded retries and concurrent-insert behavior; the failure outcomes are observable and covered in V04.</td><td>PASS</td></tr>
+<tr><td>R06 / V01–V05</td><td>Check each verification procedure has an expected result and is feasible with current package scripts.</td><td>V01–V04 specify synthetic migration, two-owner API, archive/redirect, and duplication/collision checks. V05 names existing <code>pnpm --filter @redirect-hub/api test</code> and web build scripts; feature-specific tests are future implementation work. No application tests were run in this planning review.</td><td>PASS</td></tr>
+<tr><td>R07 / scope & dependencies</td><td>Compare ticket scope/dependencies with product direction and queue.</td><td>No multi-user workspace, roles, bulk import, or custom domains are included. The ticket has no prerequisites and the queue correctly makes T-0003, T-0004, T-0005, and T-0021 depend on T-0002. The interaction with future T-0025 membership is explicitly excluded.</td><td>PASS</td></tr>
+</tbody></table>
+
+<h2>Open decision and next action</h2>
+<p><strong>Resolver:</strong> Product Owner. Choose A (copy tags and routing rules, not click history) or B (copy name and destination only). The analyst recommends A to preserve a ready-to-edit routing configuration. Until decided, AC05 is not final and T-0002 should remain in review. The Product Owner should record the choice in product docs and T-0002, after which the coordinator can update queue status to <code>ready</code>.</p>
+
+<h2>Checks and limits</h2>
+<table><thead><tr><th>ID</th><th>Command/procedure</th><th>Result</th></tr></thead><tbody>
+<tr><td>V08</td><td>Verify workspace, branch, ticket hash, and queue record.</td><td>Workspace verified as <code>D:\WorkITAAI\RDH</code>, branch <code>main</code>; ticket hash exactly matches the dispatched candidate; queue row T-0002 is <code>review</code>, no dependency, and points to this ticket.</td></tr>
+<tr><td>V09</td><td><code>git diff --check -- docs/tickets/T-0002-link-organization/ticket.html</code></td><td>No diagnostics. The candidate is already in the shared checkout; no source or ticket files were changed by this reviewer.</td></tr>
+<tr><td>V10</td><td>PowerShell structural check for shared assets, title/ID, stable acceptance IDs, verification IDs, and local links.</td><td>PASS. The exact ticket hash matched; queue title and ticket H1/ID aligned; shared CSS/menu are present; six acceptance IDs and five verification references are present; all local ticket links resolve.</td></tr>
+</tbody></table>
+<p>No application tests or browser checks were run; this is a planning-ticket review. No implementation behavior is claimed.</p>
+
+<h2>Handoff</h2>
+<p><strong>Changed path:</strong> <code>docs/reviews/2026-11-08-T0002-link-organization-readiness.html</code> only. <strong>Next owner:</strong> Product Owner, for the duplication option decision. Following the durable decision, coordinator returns the ticket to readiness and assigns developer delivery only if approved.</p>
+</main></body></html>

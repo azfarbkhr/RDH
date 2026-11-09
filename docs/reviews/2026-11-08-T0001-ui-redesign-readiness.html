@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>T-0001 UI redesign readiness review | Redirect Hub</title>
+  <link rel="stylesheet" href="../assets/site.css">
+  <script defer src="../assets/menu.js"></script>
+</head>
+<body>
+  <main>
+    <h1>T-0001 UI redesign readiness review</h1>
+    <p><strong>Verdict: NEEDS-INFO</strong> — the acceptance checks are sufficiently groomed, but the assigned <code>ui-developer</code> role guide defines completion around document extraction workflows that do not apply to Redirect Hub. The coordinator needs to resolve this role-to-scope mismatch before delivery assignment.</p>
+
+    <h2>Candidate reviewed</h2>
+    <ul>
+      <li><strong>Candidate:</strong> <code>docs/tickets/T-0001-app-ui-redesign/ticket.html</code></li>
+      <li><strong>Candidate commit:</strong> None; the shared checkout is uncommitted.</li>
+      <li><strong>Candidate SHA-256:</strong> <code>DF1CD26BF2B00E3E5A6B24C17EC48ED39638F76FA4EEAA04DECA426F3A42F83C</code></li>
+      <li><strong>Workspace / branch:</strong> <code>D:\WorkITAAI\RDH</code> / <code>main</code>, verified before review. The assigned review record was writable.</li>
+    </ul>
+
+    <h2>Readiness checklist</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Review area</th><th>Procedure and evidence</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>R1</td><td>Outcome</td><td>Read ticket outcome and D-002 in <code>docs/product/2026-11-08-backlog-decisions.html</code>. The objective is an improved existing React workspace; README is the showcase, and no marketing landing page is requested.</td><td>PASS — bounded and consistent with the recorded owner direction.</td></tr>
+        <tr><td>R2</td><td>Delivery role</td><td>Compared ticket role at <code>ticket.html</code> with <code>agent-team/ui-developer/AGENTS.md</code> and <code>agent-team/coordinator/AGENTS.md</code>.</td><td>NEEDS-INFO — the role guide owns document upload, extraction progress, source-page/grid inspection, and extraction-adapter coordination. Those deliverables do not exist in T-0001. The coordinator guide broadly assigns bounded interaction work to UI Developer, but the specific completion rules conflict with this ticket.</td></tr>
+        <tr><td>R3</td><td>Scope and dependencies</td><td>Reviewed ticket scope and D-002. Scope is the existing setup/sign-in, link, routing/simulator, analytics, and token screens; API contracts and new capabilities are excluded. Ticket declares no dependencies.</td><td>PASS — explicit, cohesive, and supported by the documented decision.</td></tr>
+        <tr><td>R4</td><td>Evidence and open decisions</td><td>Read the current <code>apps/web/src/main.tsx</code> and <code>apps/web/src/styles.css</code> plus ticket current-evidence section. Source contains the named UI areas, existing feedback, responsive CSS breakpoints, and focus-visible styling. Ticket explicitly says no screenshots, browser walkthrough, keyboard review, or contrast measurements exist.</td><td>PASS — code presence is distinguished from unverified visual/accessibility outcomes. No additional product decision is identified as necessary.</td></tr>
+        <tr><td>R5</td><td>Documentation impact</td><td>Reviewed the ticket documentation-impact section and D-002. It calls for genuine application screenshots and correction of any README workflows that change after the redesign.</td><td>PASS — the follow-up is relevant and appropriately contingent on verified screens.</td></tr>
+        <tr><td>AC01 / V01</td><td>Visual system and workflow clarity</td><td>AC01 has a stable ID and observable concerns (shared tokens/components, scannable link names/actions, understandable states). V01 calls for before/after screen captures and inspection of repeated patterns, hierarchy, and states, with expected consistency and no fabricated metrics.</td><td>PASS for grooming readiness. Actual appearance remains unverified.</td></tr>
+        <tr><td>AC02 / V02</td><td>Responsive layouts</td><td>AC02 identifies the in-scope screens, 390px and 1440px widths, and overflow/clipping/obscuration outcomes. V02 specifies opening each screen at both sizes and inspecting controls and page edges.</td><td>PASS for grooming readiness. Browser verification remains unrun; the ticket's phrase “documented browser” does not name a browser, a minor execution detail that can be recorded during implementation.</td></tr>
+        <tr><td>AC03 / V03</td><td>Keyboard and contrast</td><td>AC03 specifies keyboard completion, visible focus, programmatic labels, dialog close path, and WCAG AA text/control contrast. V03 specifies a keyboard-only walkthrough and contrast measurements, with expected focus/labels, no trap, and AA ratios.</td><td>PASS for grooming readiness. No keyboard or contrast evidence is claimed.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Verification and limits</h2>
+    <p>This was a requirements/readiness review. I inspected the current ticket, product decision, project instructions, UI role instructions, and React source. I did not run application tests, a build, a browser walkthrough, contrast measurements, or <code>git diff --check</code>; these are not implementation results. The analyst's reported <code>git diff --check</code> result is not independently verified here. No ticket, queue, or source file was changed.</p>
+
+    <h2>Next action</h2>
+    <p>Coordinator: resolve the T-0001 delivery-role mismatch by recording a ticket-specific scope for the UI role or assigning a compatible role whose completion criteria cover this React redesign, then send that assignment for delivery. No Product Owner decision is needed for the already approved visual direction.</p>
+  </main>
+</body>
+</html>

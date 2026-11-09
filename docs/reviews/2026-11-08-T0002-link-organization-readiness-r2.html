@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>T-0002 requirements readiness review R2 | Redirect Hub</title><link rel="stylesheet" href="../assets/site.css"><script src="../assets/menu.js" defer></script></head><body><main>
+<h1>T-0002 requirements readiness review R2</h1>
+<p><strong>Deliverable:</strong> Requirements readiness review. <strong>Candidate:</strong> ticket HTML SHA-256 <code>7BDDD9541DD40F42939FE7CB4AD82B8D944847B4DF552F850BEC37CD5F7E89D7</code>. <strong>Commit:</strong> none; documentation candidate.</p>
+<p><strong>Workspace/branch:</strong> <code>D:\WorkITAAI\RDH</code>, <code>main</code>. <strong>Review date:</strong> 8 November 2026.</p>
+
+<h2>Verdict: PASS</h2>
+<p>D-009 resolves the sole open product choice from the initial review. T-0002 AC05 and its duplication verification agree with the decision: duplicate name, destination, tags, and routing rules using a new active link, global slug, and rule IDs; do not copy click history or analytics. The remaining acceptance criteria are observable, technically grounded in the current app, and have feasible implementation verification procedures. The ticket is ready for Product Owner-approved delivery, subject to coordinator queue update.</p>
+
+<h2>Acceptance-check review</h2>
+<table><thead><tr><th>ID</th><th>Review procedure</th><th>Evidence/result</th><th>Outcome</th></tr></thead><tbody>
+<tr><td>R01 / AC01</td><td>Compare migration requirements against current SQLite schema/startup migration in <code>apps/api/src/db.ts</code>.</td><td>AC01 enumerates existing IDs, slug, name, destination, owner, timestamps, rules, events, default active state, and redirect preservation. Its synthetic pre-change fixture procedure is feasible. D-009 does not alter this scope.</td><td>PASS</td></tr>
+<tr><td>R02 / AC02–AC03</td><td>Compare ownership and search claims against <code>apps/api/src/index.ts</code> and <code>apps/web/src/main.tsx</code>.</td><td>Current list and mutation queries are owner-scoped; UI search covers name/slug/destination. Tags and tag/archive filters are not present. AC02–03 specify normalization, per-owner uniqueness, combined filters, and foreign-owner denial. Two synthetic users/sessions are specified to cover isolation despite current one-account registration.</td><td>PASS</td></tr>
+<tr><td>R03 / AC04</td><td>Compare archive requirement with public slug redirect behavior in <code>apps/api/src/index.ts</code>.</td><td>Public lookup currently resolves by slug; archive is proposed as a list visibility control. AC04 and V03 state archived links continue 302 redirects with existing routing behavior.</td><td>PASS</td></tr>
+<tr><td>R04 / AC05 and D-009</td><td>Compare ticket AC05 and V04 against <a href="../product/2026-11-08-D009-link-duplication.html">D-009</a> decision text and link.</td><td>D-009 selects copying link name, destination, tags, and routing rules to a new active link with a new globally unique slug/rule IDs, and explicitly excludes click history/analytics and archive state. AC05 matches; V04 exercises routing rules, tags, synthetic history, ownership, and generated slug behavior. The ticket handoff links to D-009.</td><td>PASS</td></tr>
+<tr><td>R05 / AC06</td><td>Compare slug-collision acceptance with existing API schema/database uniqueness and slug creation.</td><td>Current schema allows 3–48 ASCII alphanumeric, hyphen, or underscore custom slugs; DB enforces global uniqueness, explicit collisions return 409, and generated slugs use random bytes with a uniqueness check and insertion guard. AC06 specifies bounded retry and concurrent uniqueness failure behavior.</td><td>PASS</td></tr>
+<tr><td>R06 / V01–V05</td><td>Check procedures and expected results, and verify referenced package scripts exist.</td><td>V01–V04 cover migration, owner isolation, archive/redirect, duplication/history, and slug collisions. The API test and web build scripts are present in workspace package files. Feature tests are future implementation work; no app tests were run by this reviewer.</td><td>PASS</td></tr>
+<tr><td>R07 / D-009, scope, dependencies</td><td>Check product decision link, exclusions, title, and queue dependency state.</td><td>D-009 exists and is linked from T-0002. Ticket excludes workspace migration/roles, bulk work, and custom domains, consistent with current direction. No dependencies are required; queue references T-0003, T-0004, T-0005, and T-0021 as downstream consumers.</td><td>PASS</td></tr>
+</tbody></table>
+
+<h2>Checks and limits</h2>
+<table><thead><tr><th>ID</th><th>Command/procedure</th><th>Observed result</th></tr></thead><tbody>
+<tr><td>V08</td><td>Verify checkout, ticket SHA-256, D-009, and queue row T-0002.</td><td>PASS. Workspace <code>D:\WorkITAAI\RDH</code>, branch <code>main</code>; ticket hash matches dispatched candidate; D-009 selects the exact AC05 behavior. Queue row currently says <code>blocked</code> (coordinator-owned lifecycle), though the former D-009 blocker is resolved. Coordinator should set it to <code>ready</code> after this PASS.</td></tr>
+<tr><td>V09</td><td><code>git diff --check -- docs/tickets/T-0002-link-organization/ticket.html</code></td><td>PASS; no diagnostics.</td></tr>
+<tr><td>V10</td><td>PowerShell structural check for title/ID, shared assets, six ACs, five verification IDs, and local ticket links.</td><td>PASS; all checks matched and all local links resolve.</td></tr>
+</tbody></table>
+<p>This is a planning/readiness review. No application tests, browser checks, or implementation changes were performed. Ticket candidate is documentation, not a commit.</p>
+
+<h2>Handoff</h2>
+<p><strong>Changed path:</strong> <code>docs/reviews/2026-11-08-T0002-link-organization-readiness-r2.html</code> only. <strong>Next owner:</strong> coordinator, to update T-0002 from blocked to ready in JSONL and dispatch the Developer. D-009 is the recorded Product Owner decision; no owner-only question remains.</p>
+</main></body></html>

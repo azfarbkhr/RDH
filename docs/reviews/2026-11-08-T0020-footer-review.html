@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Independent review: Remove the application footer | Redirect Hub</title><link rel="stylesheet" href="../assets/site.css"><script src="../assets/menu.js" defer></script></head><body><main>
+<h1>Independent review: Remove the application footer</h1>
+<p><strong>Ticket:</strong> <a href="../tickets/T-0020-remove-footer/ticket.html">T-0020</a>. <strong>Reviewer:</strong> Independent Reviewer. <strong>Workspace/branch:</strong> <code>D:\WorkITAAI\RDH</code> / <code>main</code>.</p>
+<p><strong>Candidate:</strong> no commit is available. The source files remain untracked as part of the broader initial application work. I reviewed the exact current files by SHA-256: <code>main.tsx</code> <code>915F65C59B80073D9A50269E33CCF2294338987021EB9F50B4851E1B578FC470</code>; <code>styles.css</code> <code>8B6486E647F53B63B1307B436A9A3EFD4831AB173598775135AC6A19BC44D0CF</code>; ticket evidence <code>238EEB49EEA33A5CAEFCFA5DF6FD2405E0D122C029EB43AF7B85655D05D7B365</code>. The review applies only to those exact files, not a commit.</p>
+
+<h2>Verdict: NEEDS-INFO</h2>
+<p>AC01 and AC02 pass by source inspection. The production build passes. AC03 has only partial independent visual evidence: I inspected the Overview in Chrome at the currently configured viewport, but did not independently cover the required representative routes and both viewport widths. The implementer's Chrome observations are attributed to the UI developer and are not substituted for reviewer verification. Coordinator rules also require review of a candidate commit before closing a ticket; no attributable commit exists because the application source is untracked among broader initial project files.</p>
+
+<h2>Acceptance checks</h2>
+<table><thead><tr><th>ID</th><th>Procedure and evidence</th><th>Observed result</th><th>Outcome</th></tr></thead><tbody>
+<tr><td>AC01</td><td>Inspected <code>apps/web/src/main.tsx</code>, <code>apps/web/src/styles.css</code>; ran <code>rg -n 'page-footer|auth-footnote' apps/web/src</code>.</td><td>No authenticated <code>page-footer</code> JSX or selector remains. The distinct sign-in <code>auth-footnote</code> remains in JSX and CSS. Source SHA-256 values match the candidate listed above.</td><td>PASS</td></tr>
+<tr><td>AC02</td><td>Inspected the sign-in JSX and its CSS selector in the current source.</td><td>The private-instance sign-in note remains rendered by the sign-in view. I did not navigate the user's browser session to the sign-in page, so visibility was verified from the source only.</td><td>PASS with source-only evidence</td></tr>
+<tr><td>AC03</td><td>Reviewed the Overview in the existing Chrome tab at <code>http://127.0.0.1:5173/#/overview</code>; ran <code>pnpm --filter @redirect-hub/web build</code>. Implementer's route/viewport walkthrough is recorded in the T-0020 ticket and attributed to the UI developer.</td><td>The Overview accessibility tree contains no footer element or footer content, and the web production build succeeds. Reviewer did not independently inspect Links, Analytics, Developer, real link detail, sign-in, or the full 390px and 1440px matrix. No screenshots were saved by this review.</td><td>NEEDS-INFO</td></tr>
+</tbody></table>
+
+<h2>Other checks</h2>
+<table><thead><tr><th>ID</th><th>Procedure</th><th>Observed result</th><th>Outcome</th></tr></thead><tbody>
+<tr><td>R01</td><td>Verified checkout location/branch and candidate hashes using PowerShell; checked <code>git status --short</code>.</td><td>Workspace is <code>D:\WorkITAAI\RDH</code> on <code>main</code>. Both app source files and the ticket file are untracked; many unrelated existing project edits are also present.</td><td>PASS</td></tr>
+<tr><td>R02</td><td>Ran <code>pnpm --filter @redirect-hub/web build</code>.</td><td>TypeScript compilation and Vite production build succeeded.</td><td>PASS</td></tr>
+<tr><td>R03</td><td>Ran <code>git diff --check -- apps/web/src/main.tsx apps/web/src/styles.css docs/tickets/T-0020-remove-footer/ticket.html</code>.</td><td>No diagnostics were emitted. Because all three paths are untracked, Git does not include their content in a normal diff check; this command is not evidence of whitespace validation for them.</td><td>LIMITED</td></tr>
+</tbody></table>
+
+<h2>Handoff</h2>
+<p><strong>Changed path:</strong> this review artifact only. <strong>Limits:</strong> no candidate commit, no independently repeated multi-route responsive walkthrough, no sign-in visual inspection, and no saved screenshot. No application tests were run. The UI developer's own browser checks are detailed in the linked ticket but remain separate from reviewer evidence.</p>
+<p><strong>Next action:</strong> coordinator should preserve the exact source hashes, obtain an attributable candidate commit when the project baseline can be staged without absorbing unrelated work, and have the UI developer or reviewer independently complete the missing Chrome route/viewport checks using synthetic data. Keep T-0020 in review until AC03 and exact-candidate review requirements are satisfied.</p>
+</main></body></html>

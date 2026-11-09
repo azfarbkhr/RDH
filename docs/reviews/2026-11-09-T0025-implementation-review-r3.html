@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-0025 implementation review R3 | Redirect Hub</title>
+<link rel="stylesheet" href="../assets/site.css">
+<script src="../assets/menu.js" defer></script>
+</head>
+<body><main>
+<h1>T-0025 implementation review R3</h1>
+<p><strong>Verdict:</strong> NEEDS-INFO. <strong>Candidate:</strong> working tree on <code>main</code>, baseline <code>8f63bb5a66655154197e570af1a4a3dfe0b26323</code>; no commit. The checkout contains other dirty workstreams, so no candidate commit was made. This report reviews the current T-0025 files and does not alter code, ticket acceptance/results, or queue metadata.</p>
+
+<h2>Environment and independent verification</h2>
+<ul>
+<li>Workspace: <code>D:\WorkITAAI\RDH</code>; Node <code>v24.22.1</code>; pnpm <code>11.25.0</code>.</li>
+<li><code>pnpm --filter @redirect-hub/api test</code> — PASS, 9/9 tests, 0 failures. Independently run by this reviewer on temporary synthetic SQLite data.</li>
+<li><code>pnpm --filter @redirect-hub/api build</code> — PASS, <code>tsc --noEmit</code>.</li>
+<li><code>pnpm --filter @redirect-hub/web build</code> — PASS, TypeScript and Vite production build.</li>
+<li><code>git diff --check -- apps/api/src/index.ts apps/api/tests/workspaces-and-invitations.test.ts docs/tickets/T-0025-link-invitations/ticket.html</code> — exit 0; Git printed only the known LF-to-CRLF conversion warning.</li>
+<li>No access to <code>data/redirect-hub.sqlite</code>.</li>
+</ul>
+
+<h2>Acceptance-check and verification review</h2>
+<table><thead><tr><th>ID</th><th>Procedure and evidence</th><th>Observed result and outcome</th></tr></thead><tbody>
+<tr><td>AC01 / V01</td><td>Ran the API suite; inspected <code>apps/api/src/db.ts</code> and the synthetic migration fixture in <code>apps/api/tests/workspaces-and-invitations.test.ts</code>.</td><td>Pass for the covered migration. Existing users receive separate workspaces and memberships; link/tag/rule/click/token identifiers and associations are snapshotted; a child process reruns startup on the same temporary DB and snapshots remain identical. Default, CA-country, mobile-device, and non-matching redirects are checked, along with event counts and IDs. The unowned legacy link remains unassigned.</td></tr>
+<tr><td>AC02</td><td>Ran invitation API tests; inspected session/bearer authentication and owner guards in <code>apps/api/src/index.ts</code>.</td><td>Pass for covered paths. Owner sessions create/list/revoke; members cannot create/list/revoke; a different account cannot access a guessed workspace; an owner bearer token cannot administer invitations. Invitation listings omit both raw secret and hash.</td></tr>
+<tr><td>AC03 / V02</td><td>Ran invite lifecycle tests and inspected secret generation, persistence, and expiry predicates.</td><td>Pass. Secret is generated from 32 random bytes and persisted as SHA-256; creation returns the copyable fragment URL; listings/redemption responses redact secret values; seven-day UTC expiry and revocation are asserted. A Node mock Date clock verifies equality with the expiry instant is rejected without creating a user or consuming the invitation.</td></tr>
+<tr><td>AC04 / V03</td><td>Inspected URL parsing and cleanup in <code>apps/web/src/main.tsx</code>, the POST body, API responses, and tests.</td><td>Partial; needs evidence. Source places the secret in the fragment, calls <code>history.replaceState</code> before form submission, posts it in JSON, and clears state in <code>finally</code>. Tests check response/listing redaction. The required browser address/history, request URL/body/referrer capture and access/application/proxy log inspection were not run. Malformed/wrong-secret and injected account-creation failure cases are also untested.</td></tr>
+<tr><td>AC05</td><td>Inspected the redemption paragraph in <code>apps/web/src/main.tsx</code>, ticket AC05/V05, and R1/R2 review reports.</td><td>Pass. The screen says before submission that the invitation expires after seven days, is single-use, can be claimed by anyone who obtains it, and uses an unverified email address; it also says no email is sent. R1's concrete omission is corrected; R2 passed that bounded correction.</td></tr>
+<tr><td>AC06 / V03</td><td>Ran synthetic redemption tests for valid, duplicate-email, expired, revoked, consumed, simultaneous, and exact-expiry cases; inspected the transaction in <code>apps/api/src/index.ts</code>.</td><td>Partial; needs evidence for malformed/wrong-secret and injected account-creation failure. <code>BEGIN IMMEDIATE</code> wraps account, personal workspace, invited membership, consumption, and session creation. The tests verify one concurrent winner and that duplicate-email/expired/revoked/used/exact-expiry failures do not consume the invitation or create an account. Rollback under injected account-creation failure remains unverified.</td></tr>
+<tr><td>AC07 / V04</td><td>Ran workspace access tests; inspected read-route queries and the new <code>GET /api/links/:id</code> handler at <code>apps/api/src/index.ts:636</code>.</td><td>Pass for covered routes. The detail endpoint uses <code>getOwnedLink(id, workspaceId)</code> and returns the same 404 for an absent or cross-workspace link. Tests cover member list/detail/rules/tags/analytics/archive reads, archived-link visibility, simulator access, and guessed link/rule IDs from another workspace returning 404 without data. UI marks the selected shared workspace read-only and hides mutation controls.</td></tr>
+<tr><td>AC08 / V04</td><td>Ran API denial and DB-snapshot assertions for member writes and checked owner regressions.</td><td>Pass for covered routes. Member create/update/archive/unarchive/duplicate, tag/rule mutations, invitation create/list/revoke, and token list/create/revoke are denied; link, rule, tag, invitation, and token snapshots remain unchanged. Tests also confirm owner detail/archive/unarchive, invitation, and token operations remain available. Inspected routes contain no account-administration or link-delete endpoint.</td></tr>
+<tr><td>AC09 / V05</td><td>Ran bearer-token privacy checks; inspected API token workspace resolution and <code>apps/api/src/mcp.ts</code>.</td><td>Partial; MCP evidence is missing. Invitee-created bearer token reads only the invitee's personal workspace and gets 403 when selecting the invited workspace. Token management is denied in the shared workspace. MCP execution was not attempted because its module starts stdio at import and has no injectable API transport; the ticket names this constraint. Developer can provide a synthetic MCP test seam or an isolated local HTTP exercise.</td></tr>
+<tr><td>AC10 / V01</td><td>Ran the startup migration fixture and public redirect/event checks.</td><td>Pass for the tested cases. Existing default, country and device routing destinations continue to resolve with original slugs; the non-match falls back to default; event identities/counts are preserved and new redirects add the expected events. Migration rerun is idempotent on the synthetic fixture.</td></tr>
+<tr><td>AC11</td><td>Inspected the user/technical invitation guides, README, and documentation indexes.</td><td>Pass by content inspection. The docs describe owner-only manual invitation management, one-time copy, seven-day expiry, account creation, unverified email, bearer-link sharing risk, read-only scope, and no email or shared-workspace API/MCP access.</td></tr>
+</tbody></table>
+
+<h2>Specific review of the new detail endpoint</h2>
+<p><code>GET /api/links/:id</code> is behind the existing authenticated <code>/api/*</code> middleware, looks up the record using both link ID and the verified workspace ID, and returns the same “Link not found” 404 for inaccessible IDs. Tests confirm an invited member reads a joined-workspace link and a guessed link from another workspace returns 404 without exposing its name. No defect was found in this addition.</p>
+
+<h2>Remaining evidence and owner</h2>
+<p>No concrete implementation defect was found in this updated candidate. The ticket remains open because AC04 and AC06 lack some required failure-path, browser, and log evidence, and AC09 lacks an executed MCP authorization check. The Developer can add synthetic malformed/wrong-secret and account-creation-failure tests, capture browser history/network/referrer behavior and inspect configured logs, and add an isolated MCP authorization exercise (or record why that capability cannot be tested). The MCP limitation is explicitly described in the ticket. No live browser or MCP client was used in this review.</p>
+
+<h2>Next action</h2>
+<p>Keep T-0025 in review/needs-information status. Have the Developer provide the remaining synthetic and browser/log evidence, plus an MCP check or bounded evidence-backed limitation, then request another independent review. This verdict is not approval to close the ticket.</p>
+</main></body></html>

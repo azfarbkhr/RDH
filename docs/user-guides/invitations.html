@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workspace invitations | Redirect Hub</title>
+<link rel="stylesheet" href="../assets/site.css">
+<script src="../assets/menu.js" defer></script>
+</head>
+<body><main>
+<h1>Invite a read-only workspace member</h1>
+<p>Owners can share links to let another person inspect a workspace's links, routing rules, and analytics. Invitations are manually shared bearer links; Redirect Hub does not email them.</p>
+<h2>Create and share an invitation</h2>
+<ol>
+<li>Open <strong>Workspace</strong> in the app navigation.</li>
+<li>Select <strong>Create invite link</strong>, then copy the URL from the one-time result.</li>
+<li>Send the URL to the intended person using a channel you trust. The full URL is shown only when created; the invitation history shows status and expiry, not the secret.</li>
+</ol>
+<p>Each invite link expires exactly seven days after creation, can be redeemed once, and can be revoked by the workspace owner before redemption.</p>
+<h2>Redeem an invitation</h2>
+<p>The recipient opens the link and creates a new account with an email address and password. The email address is not verified, and no email or notification is sent. Once accepted, the recipient can switch between their personal workspace and the invited workspace.</p>
+<h2>Access and bearer-link safety</h2>
+<p>Invited members can read workspace links, routing rules, tags, and workspace analytics, and can preview routing with the visitor simulator. They cannot create or change links, rules, or tags, manage invitations, or use API tokens or MCP for the shared workspace.</p>
+<p>Anyone who obtains an unused invite URL can claim it. Share it only with the intended recipient, avoid public posts, and revoke it if it was shared by mistake. A recipient's entered email is not verified. Invitation links do not grant API or MCP access.</p>
+<p>See the <a href="../technical/workspaces-and-invitations.html">workspace and invitation technical notes</a> for the authorization and storage model.</p>
+</main></body>
+</html>

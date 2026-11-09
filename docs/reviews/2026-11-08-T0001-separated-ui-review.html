@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>T-0001 separated UI review | Redirect Hub</title>
+  <link rel="stylesheet" href="../assets/site.css">
+  <script defer src="../assets/menu.js"></script>
+</head>
+<body>
+  <main>
+    <h1>T-0001 separated UI review</h1>
+    <p><strong>Verdict: FAIL.</strong> The requested task-focused page separation is implemented in code, but this candidate has a false empty-routing state, network failures in routing-rule mutations are not handled in the UI, and several text colors fail WCAG AA contrast. Responsive and full keyboard behavior remain only partially evidenced.</p>
+
+    <h2>Candidate reviewed</h2>
+    <ul>
+      <li><strong>Candidate commit:</strong> None; project/app sources are uncommitted in the shared checkout.</li>
+      <li><strong>Workspace / branch:</strong> <code>D:\WorkITAAI\RDH</code> / <code>main</code>.</li>
+      <li><strong>Reviewer:</strong> Independent Reviewer; Windows PowerShell for build and Git checks; source-level review and contrast arithmetic performed in this review.</li>
+      <li><strong>SHA-256:</strong> <code>apps/web/src/main.tsx</code> — <code>71A17171B75BA7D01516ADF06DB2A358A6E147F073B52E133578895CC82AD837</code>; <code>apps/web/src/styles.css</code> — <code>D581BE69D528617B8E87A5DD95058D49FB847249EC7B057219B36164A513F7F7</code>; <a href="../tickets/T-0001-app-ui-redesign/ticket.html">T-0001 ticket</a> — <code>7BB50927A9ED31C62DB5C528BA521F883AA6B40DAAB8D3A8F0465683BEFDDA3A</code>. All matched dispatch before inspection.</li>
+    </ul>
+
+    <h2>Acceptance review</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Procedure, evidence, and observed result</th><th>Outcome</th></tr></thead>
+      <tbody>
+        <tr><td>AC01 / V01</td><td><strong>Procedure:</strong> Inspected route parsing/render conditions, link detail tabs, routing editor, async token and data states, and the ticket's V01 procedure/result. <strong>Evidence:</strong> <code>apps/web/src/main.tsx:20-26, 52-113, 317-378</code>; ticket V01 in <code>docs/tickets/T-0001-app-ui-redesign/ticket.html</code>. <strong>Verified:</strong> Overview, Links, Create, Analytics, Developer, and per-link detail render as distinct task routes. The Links collection does not render the complete create form or analytics dashboard. Routing rules and simulator are in the link's Routing tab. Per-link Analytics clearly says the per-link capability is unavailable and links to workspace analytics. These choices respect T-0001's UI-only scope. <strong>Developer-reported, not independently observed:</strong> Chrome inspection of Overview, Links, Create, Analytics, and Developer/API at 390px; Analytics at 1440px; no populated link/detail data; no saved screenshots. <strong>Defects found:</strong> (1) <code>RoutingEditor</code> starts with <code>open=true</code> and <code>rules=[]</code>; it does not load rules on mount. <code>loadRules()</code> runs only when reopening after a close (<code>main.tsx:53-72</code>). The first view therefore presents “No rules yet” even when server rules exist; the user must close and reopen to see the actual state. (2) <code>mutateRule()</code> handles non-OK responses but has no try/catch (<code>main.tsx:87-95</code>). A rejected fetch or JSON parse leaves the mutation without visible failure feedback and may produce an unhandled rejection, contrary to AC01's understandable error-state requirement.</td><td><strong>FAIL.</strong> Separate page structure is present, but the two concrete routing state/error defects require correction.</td></tr>
+        <tr><td>AC02 / V02</td><td><strong>Procedure:</strong> Reviewed the responsive breakpoints and implementation handoff against every screen/viewport required by the ticket. No browser operation was performed by this reviewer. <strong>Evidence:</strong> <code>apps/web/src/styles.css:187-189, 268-269</code>; ticket V02. The CSS includes small-screen layouts and horizontally scrollable navigation. <strong>Developer-reported, not independently observed:</strong> 390px checks on Overview, Links, Analytics, Developer/API measured document width 375/375; 1440px Analytics measured 1440/1440; Create was visually inspected at a default desktop size. Setup/sign-in, Create at both target widths, Link Details and Routing at either width, and most 1440px screen checks remain open. No screenshots were saved.</td><td><strong>NEEDS-INFO.</strong> Reported partial viewport evidence is insufficient for all AC02 screens; no new clipping/overflow defect was independently confirmed.</td></tr>
+        <tr><td>AC03 / V03</td><td><strong>Procedure:</strong> Inspected labels, native controls, route navigation semantics, skip link/focus CSS, and text color declarations. Calculated WCAG relative luminance contrast ratios for listed foreground colors on their declared white surfaces; normal text requires 4.5:1 for AA. <strong>Evidence:</strong> <code>apps/web/src/styles.css:2, 212-214, 241, 245-252</code>; <code>apps/web/src/main.tsx:322-326, 370-374</code>. Several text styles are below 4.5:1: <code>.detail-tabs button</code> uses <code>#758178</code> at 4.06:1 on white; <code>.overview-metrics article&gt;small</code> and <code>.detail-card small</code> use <code>#7b877f</code> at 3.74:1; <code>.detail-wide&gt;p</code> uses <code>#718076</code> at 4.16:1; and <code>.eyebrow</code> uses <code>#8b978e</code> at 3.04:1. <strong>Not verified:</strong> No keyboard-only walkthrough, exhaustive interactive-control contrast review, or browser focus check was performed. A skip link and focus-visible declarations exist, but code presence does not prove complete keyboard operation.</td><td><strong>FAIL.</strong> The measured text ratios do not meet the ticket's WCAG AA requirement. Full keyboard procedure remains open.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Verification and limits</h2>
+    <ul>
+      <li><strong>Reviewer, Windows PowerShell:</strong> <code>pnpm build</code> — passed, exit code 0. API TypeScript check and web TypeScript/Vite production build completed.</li>
+      <li><strong>Reviewer, Windows PowerShell:</strong> <code>git diff --check -- apps/web/src/main.tsx apps/web/src/styles.css</code> — passed, exit code 0.</li>
+      <li><strong>Reviewer:</strong> contrast ratios above were calculated from the source hex colors using WCAG relative-luminance arithmetic against white backgrounds, not captured from a browser. Review was read-only apart from this report.</li>
+      <li>No automated tests were added or run. No Chrome/browser, 390px/1440px, keyboard-only, full color audit, or screenshot procedure was performed by this reviewer. The partial viewport results are attributed to the UI Developer's ticket handoff.</li>
+    </ul>
+
+    <h2>Handoff</h2>
+    <p><strong>UI Developer:</strong> load routing rules when the routing editor first mounts (or show an explicit loading state until they arrive); catch network/JSON errors for reorder/delete and announce them visibly; raise failing text-token contrast to at least 4.5:1 on each actual background, then audit control contrast and keyboard interaction. <strong>Coordinator:</strong> keep T-0001 in progress. The missing AC02 and keyboard evidence can be supplied by the UI Developer through the specified browser walkthrough, with saved captures or recorded results, then route the corrected exact candidate for another independent review. This reviewer changed only this review artifact; no source, ticket, or queue metadata was modified.</p>
+  </main>
+</body>
+</html>

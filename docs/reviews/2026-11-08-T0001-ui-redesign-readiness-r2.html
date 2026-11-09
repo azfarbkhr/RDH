@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>T-0001 UI redesign readiness review, round 2 | Redirect Hub</title>
+  <link rel="stylesheet" href="../assets/site.css">
+  <script defer src="../assets/menu.js"></script>
+</head>
+<body>
+  <main>
+    <h1>T-0001 UI redesign readiness review, round 2</h1>
+    <p><strong>Verdict: PASS for grooming readiness.</strong> The updated ticket explicitly adapts the copied UI Developer role guide to this product without changing that shared guide. Its outcome, boundaries, dependencies, acceptance checks, verification procedures, and documentation impact are ready for implementation. This verdict does not mean the visual redesign itself has passed.</p>
+
+    <h2>Candidate reviewed</h2>
+    <ul>
+      <li><strong>Candidate:</strong> <a href="../tickets/T-0001-app-ui-redesign/ticket.html">T-0001 ticket</a></li>
+      <li><strong>Candidate commit:</strong> None; the shared checkout contains uncommitted project work.</li>
+      <li><strong>Candidate SHA-256:</strong> <code>C3701A35178C02D51A5A397F183C0E110D62C45B9862C8D3EC8A7A6D5BAFCBE4</code> (independently recomputed during this review)</li>
+      <li><strong>Workspace / branch:</strong> <code>D:\WorkITAAI\RDH</code> / <code>main</code></li>
+      <li><strong>Review date:</strong> 8 November 2026</li>
+    </ul>
+
+    <h2>Readiness checklist</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Review area</th><th>Procedure and evidence</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>R1</td><td>Outcome and owner direction</td><td>Read T-0001 and <a href="../product/2026-11-08-backlog-decisions.html">D-002 and D-003</a>. The ticket improves the existing React workspace and keeps the README as the GitHub showcase; it requests no marketing landing page.</td><td>PASS — matches recorded owner direction.</td></tr>
+        <tr><td>R2</td><td>Delivery role</td><td>Compared the ticket's new “Ticket-specific UI Developer scope” with the unchanged <code>agent-team/ui-developer/AGENTS.md</code> and coordinator role mapping. The ticket maps the role's browser tryout, interaction clarity, user-facing states, documentation, and handoff practices to setup/sign-in, link management, routing/simulator, analytics, and API-token flows. It explicitly excludes extraction-only adapter, OCR, grid, and document-type work and directs the implementer to AC01–AC03 / V01–V03.</td><td>PASS — mismatch from the prior review is resolved at the ticket level while the copied role guide remains unchanged. Include this scope override in the delivery assignment prompt.</td></tr>
+        <tr><td>R3</td><td>Scope and dependencies</td><td>Compared ticket scope with its current-evidence section and <code>apps/web/src/main.tsx</code>. Scope is limited to already implemented setup/sign-in, link workflows, routing/simulator, analytics, and token panel; API contracts and new capabilities are excluded. Queue record lists no dependencies.</td><td>PASS — bounded, coherent scope with no unresolved prerequisite.</td></tr>
+        <tr><td>R4</td><td>Evidence and open decisions</td><td>Inspected the ticket's current-evidence claims against <code>apps/web/src/main.tsx</code> and <code>apps/web/src/styles.css</code>. The ticket distinguishes code presence from unverified visual/accessibility outcomes and identifies no new product decision.</td><td>PASS — no unsupported claim that AC01–AC03 already pass; implementation evidence remains pending.</td></tr>
+        <tr><td>R5</td><td>Documentation impact</td><td>Compared the ticket documentation-impact section with D-003 and the README showcase direction. It requires genuine application screenshots only after the screens pass review and correction of any changed workflows.</td><td>PASS — relevant and appropriately conditional.</td></tr>
+        <tr><td>AC01 / V01</td><td>Visual system and workflow clarity</td><td>Reviewed AC01 and V01. The check defines consistent design tokens/components, scan-friendly link names/actions, and understandable states; the procedure captures before/after screens and inspects patterns, hierarchy, and feedback, while prohibiting fabricated metrics.</td><td>PASS for readiness — stable ID, observable outcomes, feasible procedure, and expected result. Actual UI appearance is not verified here.</td></tr>
+        <tr><td>AC02 / V02</td><td>Responsive behavior</td><td>Reviewed AC02 and V02. They name 390px and 1440px, enumerate the in-scope workflows, and define overflow, clipping, and obscuration outcomes. The implementer can record the actual browser in the handoff.</td><td>PASS for readiness — feasible procedure and observable result. No browser walkthrough was performed in this review.</td></tr>
+        <tr><td>AC03 / V03</td><td>Keyboard access and contrast</td><td>Reviewed AC03 and V03. The check covers keyboard completion, visible focus, programmatic labels, dialog close path, and WCAG AA text/control contrast; the procedure specifies keyboard-only walkthrough and contrast measurement.</td><td>PASS for readiness — measurable criteria and feasible procedure. No keyboard walkthrough or contrast measurement was performed in this review.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Verification and limits</h2>
+    <p>I read the root, documentation, and independent-reviewer guides; queue record T-0001; the updated ticket; the prior review; D-002/D-003; and the relevant React source and stylesheet. I recomputed the candidate SHA-256 using Windows PowerShell and confirmed it matches the dispatch hash. I did not run application tests, build, browser walkthrough, keyboard review, or contrast measurements because this assignment reviewed ticket readiness only. The first review's <a href="2026-11-08-T0001-ui-redesign-readiness.html">NEEDS-INFO</a> was about role applicability and is superseded for this updated candidate by the ticket-specific scope recorded here. No ticket, queue, or source file was changed by the reviewer.</p>
+
+    <h2>Next action</h2>
+    <p>Coordinator: record this PASS in the ticket and set T-0001 to <code>ready</code> in the canonical queue. Then assign the UI Developer using the ticket's explicit scope override and require evidence for AC01–AC03. Keep T-0001 open until implementation evidence and independent implementation review pass.</p>
+  </main>
+</body>
+</html>

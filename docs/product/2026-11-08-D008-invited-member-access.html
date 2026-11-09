@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>D-008: Invitation access boundary | Redirect Hub</title><link rel="stylesheet" href="../assets/site.css"><script src="../assets/menu.js" defer></script></head><body><main>
+<h1>D-008: Invitation access boundary</h1>
+<p><strong>Status:</strong> owner decision recorded 8 November 2026. <strong>Related ticket:</strong> <a href="../tickets/T-0025-link-invitations/ticket.html">T-0025 — Invite users with expiring links</a>. <strong>Independent review:</strong> <a href="../reviews/2026-11-08-feature-ticket-readiness.html">feature-ticket readiness review</a>.</p>
+
+<h2>Decision recorded</h2>
+<p>The owner selected <strong>A + 2</strong>: invitees get read-only access to shared links and analytics in the UI, and may create an email/password account while redeeming the invitation. The invitation flow sends no email. For v1, invitees cannot mutate links, manage invitations, or access shared workspaces through API/MCP credentials. This least-privilege interpretation can be revisited only if the owner later requests read-only API/MCP access.</p>
+
+<h2>Verified evidence</h2>
+<ul>
+<li><code>apps/api/src/db.ts</code> stores links against one <code>owner_id</code>. There is no workspace or membership model.</li>
+<li><code>apps/api/src/index.ts</code> allows one initial account per instance and supports email/password login. It has no invitation redemption path.</li>
+<li>The owner requested manually shared invitation links that expire after seven days, with no email sent.</li>
+<li>The owner excluded a broad role matrix, SSO, and audit logs. T-0025 proposes one uniform permission and migration that preserves the existing owner's links.</li>
+<li>The independent reviewer found that “uniform permission” is not sufficiently specific: access to reading, creating, editing, deleting, routing, analytics, API, and MCP remains undefined.</li>
+</ul>
+
+<h2>Options for member access</h2>
+<table><thead><tr><th>ID</th><th>Option</th><th>Benefits</th><th>Costs and risks</th></tr></thead><tbody>
+<tr><td>A</td><td>Read-only shared workspace access: view links and analytics, but no create/edit/delete, routing changes, or credential management.</td><td>Limits damage from a forwarded link and is simple to reason about.</td><td>Invited users cannot collaborate on the core link-management task; would require later permission expansion or roles.</td></tr>
+<tr><td>B</td><td>Full workspace collaboration for links, routing, and analytics. API/MCP calls use each member's own token and identity, scoped to that workspace; workspace invitations and other members' credentials remain owner-only.</td><td>Enables real collaboration while keeping credentials personal and avoids a role matrix.</td><td>Every member can change or disable shared links and affect traffic. Token policy and auditability need clear docs.</td></tr>
+<tr><td>C</td><td>Full owner-equivalent access, including issuing/managing workspace-wide API/MCP credentials and invitation links.</td><td>Matches a small trusted-team model and minimizes permission distinctions.</td><td>A shared invitation can grant broad account-control capabilities; mistakes or forwarded links can expose or disrupt all workspace integrations.</td></tr>
+</tbody></table>
+
+<h2>Options for redemption and account creation</h2>
+<table><thead><tr><th>ID</th><th>Option</th><th>Benefits</th><th>Costs and risks</th></tr></thead><tbody>
+<tr><td>1</td><td>Require an already existing Redirect Hub account, then sign in to redeem.</td><td>Separates account identity from the bearer invitation.</td><td>Current app has no multi-account registration flow; T-0025 would need a separate account-creation path anyway, or users cannot join.</td></tr>
+<tr><td>2</td><td>Let the bearer create an email/password account during one-time redemption; no email is sent. The first authenticated redemption consumes the invitation.</td><td>Fits the current local authentication and the owner's no-email requirement; one straightforward join flow.</td><td>The link is a bearer credential: anyone who obtains it can claim the invitation first. Without email verification, the typed email is not proof of identity. The owner must share the link only with the intended person and revoke it if exposed.</td></tr>
+</tbody></table>
+
+<h2>Product Owner recommendation</h2>
+<p>Recommend option B for access, with option 2 for redemption. Allow members to manage shared links, routing, and analytics; keep workspace invitations and cross-member credential management with the owner; bind API/MCP credentials to the individual member while enforcing the same workspace boundary. Let an invitee create an account during redemption, make the invitation single-use, and clearly warn that anyone holding the link can claim it first. This supports the requested collaboration without introducing roles or email delivery. Do not expose email/password credentials or another user's API/MCP tokens to members.</p>
+<p>This is a recommendation, not an approved product decision. The access scope materially changes the user's product and security boundary, so only the human owner can choose. The separate email verification design in T-0023 does not make a manually shared bearer invitation identify its intended recipient.</p>
+
+<h2>Owner response</h2>
+<p>On 8 November 2026, the owner selected:</p>
+<ol>
+<li><strong>Member access:</strong> A — read-only links and analytics UI access. All mutations, invitation management, and API/MCP workspace access are excluded for invitees in v1.</li>
+<li><strong>Redemption:</strong> 2 — invitee creates an email/password account while redeeming. No email is sent, so the entered email is not verified; whoever has the link may claim it first.</li>
+</ol>
+
+<h2>Decision record</h2>
+<p>Human owner response: A + 2. This differs from the Product Owner's B + 2 recommendation. T-0025 may now resume with read-only UI access and account creation during one-time invitation redemption; requirements refinement and independent readiness review are still required before implementation.</p>
+</main></body></html>

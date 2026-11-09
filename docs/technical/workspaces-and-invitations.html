@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workspaces and invitations | Redirect Hub</title>
+<link rel="stylesheet" href="../assets/site.css">
+<script src="../assets/menu.js" defer></script>
+</head>
+<body><main>
+<h1>Workspaces and invitations</h1>
+<p>Redirect Hub resolves each authenticated request to a workspace membership. Existing accounts receive a private owner workspace during database startup migration; existing links are associated with the matching account workspace without changing public slugs or click history.</p>
+<h2>Workspace model</h2>
+<ul>
+<li><code>workspaces</code> records the workspace and its owner.</li>
+<li><code>workspace_memberships</code> connects users with an <code>owner</code> or <code>member</code> role.</li>
+<li><code>links.workspace_id</code> scopes link, rule, tag, and analytics reads. Legacy links with no owner remain unassigned until the existing first-account adoption behavior applies.</li>
+</ul>
+<p>The browser sends the selected workspace in <code>X-Workspace-ID</code>. The API verifies membership for every request. API tokens use the owner's private workspace and cannot select a joined workspace.</p>
+<h2>Invitation lifecycle</h2>
+<p>Only an authenticated owner session can create, list, and revoke an invitation. Creation generates a cryptographically random bearer secret, stores its SHA-256 hash, and returns the copyable URL once. The secret is placed in a URL fragment so it is not sent in the HTTP request URL. The client removes that fragment from browser history before submitting the secret in a POST JSON body.</p>
+<p>Invitations expire seven days after creation and may be redeemed only once. Redemption creates a new user, personal workspace, read-only membership, consumed invitation state, and session atomically. A duplicate email or invalid, expired, revoked, or used invitation returns a generic failure. No email verification or email delivery occurs.</p>
+<h2>Authorization limits</h2>
+<p>Members may read joined-workspace links, routing rules, tags, and analytics and use the side-effect-free routing simulator. Mutations, invitation management, and API-token management require an owner role. Member sessions cannot use bearer API tokens or MCP to access the shared workspace; an invitee's personal workspace remains separate.</p>
+<p>This is a local/self-hosted prototype. Use HTTPS and a trusted proxy for network exposure, protect invitation URLs as credentials, and review deployment security before exposing an instance.</p>
+<p>See the <a href="../user-guides/invitations.html">workspace invitation user guide</a> for the manual owner and recipient workflow.</p>
+</main></body>
+</html>

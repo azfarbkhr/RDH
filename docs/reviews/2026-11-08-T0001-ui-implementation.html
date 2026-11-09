@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>T-0001 UI implementation review | Redirect Hub</title>
+  <link rel="stylesheet" href="../assets/site.css">
+  <script defer src="../assets/menu.js"></script>
+</head>
+<body>
+  <main>
+    <h1>T-0001 UI implementation review</h1>
+    <p><strong>Verdict: FAIL.</strong> The candidate contains a concrete misleading empty-state defect in the API-token panel (AC01). The responsive, visual-comparison, keyboard, and contrast acceptance procedures remain unverified, so this review does not pass the UI redesign.</p>
+
+    <h2>Candidate reviewed</h2>
+    <ul>
+      <li><strong>Candidate commit:</strong> None; the shared checkout contains uncommitted project work.</li>
+      <li><strong>Candidate SHA-256:</strong> <code>apps/web/src/main.tsx</code> — <code>08E54A8F19E02EA8CD7F24F68C82D7A5B89FEAD4D2E0A41F332D8FF47B37F5E5</code>; <code>apps/web/src/styles.css</code> — <code>BC70C99DA40EB86317C12194AF9D40AF619731E1B024ED66A7348332A694DB0B</code>; ticket — <code>1B144C5A762C17701C85613784B78538A2BD04F8659423129617A7655AA1CE43</code>. Hashes independently recomputed before review.</li>
+      <li><strong>Workspace / branch:</strong> <code>D:\WorkITAAI\RDH</code> / <code>main</code>.</li>
+      <li><strong>Scope:</strong> T-0001 acceptance checks AC01–AC03; implementation review of the exact shared-worktree files above.</li>
+    </ul>
+
+    <h2>Acceptance review</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Procedure and evidence</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>AC01 / V01</td><td>Inspected the React source and stylesheet against the acceptance check and reviewed the coordinator's read-only Chrome observation at <code>http://127.0.0.1:5173/</code>. The current screenshot shows a centered first-run setup card on a light neutral surface with a consistent green primary action; source adds section navigation, analytics framing, skip link, system-font stack, and shared responsive styling. However, <code>ApiTokenPanel</code> initializes <code>tokens</code> to <code>[]</code>, fetches tokens asynchronously in its mount effect, and renders “No active API tokens.” whenever the array is empty. Until the fetch completes—or if it fails—the panel presents an unverified empty state as fact. The error alert can appear alongside that false empty message.</td><td><strong>FAIL.</strong> Concrete AC01 defect. Add an explicit loading state and show the empty state only after a successful empty response; on fetch failure, show the error without claiming the list is empty. The rendered Chrome view did not expose the authenticated panel.</td></tr>
+        <tr><td>AC02 / V02</td><td>Inspected responsive rules in <code>apps/web/src/styles.css</code>, including breakpoints at 1000px, 760px, 560px, and 380px. The coordinator's Chrome screenshot is a single first-run viewport and does not cover the signed-in workspace or specified widths.</td><td><strong>NEEDS-INFO.</strong> No 390px/1440px walkthrough, overflow inspection, or screenshot comparison was run in this review. Browser verification remains necessary.</td></tr>
+        <tr><td>AC03 / V03</td><td>Inspected source for skip-link target, labels, focus-visible selectors, and API-token dialog focus entry/return, Escape handling, and Tab cycling. The implementation includes these mechanisms, but source presence does not prove keyboard completion, absence of traps, or contrast ratios.</td><td><strong>NEEDS-INFO.</strong> No keyboard-only walkthrough or contrast measurements were run in this review.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Verification and limits</h2>
+    <p>The UI Developer reported that <code>pnpm build</code> passed and <code>git diff --check</code> passed in Windows PowerShell; I did not rerun either command, and these are attributed to the UI Developer. I did not run automated tests, a build, responsive viewport checks, keyboard interaction, or contrast measurements. The Chrome screenshot and accessibility tree were captured read-only by the coordinator; they show the first-run setup screen only. The coordinator did not create an owner account, and I did not operate the browser or enter credentials.</p>
+
+    <h2>Next action</h2>
+    <p>UI Developer: fix the API-token loading/empty-state defect and return a new candidate. Coordinator: request independent review of that exact revision. The owner must authorize creation of a local synthetic owner account before authenticated screens can be inspected; after that, complete V01–V03 at the specified viewports and record the actual browser and evidence.</p>
+  </main>
+</body>
+</html>

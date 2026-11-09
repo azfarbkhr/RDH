@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-0025 implementation review R2 | Redirect Hub</title>
+<link rel="stylesheet" href="../assets/site.css">
+<script src="../assets/menu.js" defer></script>
+</head>
+<body><main>
+<h1>T-0025 implementation review R2</h1>
+<p><strong>Verdict:</strong> PASS for the bounded AC05 correction. <strong>Candidate:</strong> working tree on <code>main</code>, base <code>8f63bb5a66655154197e570af1a4a3dfe0b26323</code>; no commit. This report reviews the corrected source and AC05/V05 evidence only; it does not supersede the broader limitations in the first review.</p>
+<p>Review path: <code>docs/reviews/2026-11-09-T0025-implementation-review-r2.html</code>. Candidate code and queue metadata were not changed.</p>
+
+<h2>Environment and verification</h2>
+<ul>
+<li>Workspace: <code>D:\WorkITAAI\RDH</code>; branch <code>main</code>; Node <code>v24.22.1</code>; pnpm <code>11.25.0</code>.</li>
+<li><code>pnpm --filter @redirect-hub/web build</code> — PASS, independently run after the copy correction; TypeScript project build and Vite production build completed.</li>
+<li>Source inspection: <code>apps/web/src/main.tsx:115</code>, <code>apps/web/src/main.tsx:359</code>, <code>apps/web/src/main.tsx:369</code>, and <code>apps/web/src/main.tsx:415-421</code>.</li>
+<li>Ticket evidence inspected at <code>docs/tickets/T-0025-link-invitations/ticket.html:61</code> and <code>:71-75</code>.</li>
+</ul>
+
+<h2>Correction checks</h2>
+<table><thead><tr><th>ID</th><th>Procedure and evidence</th><th>Observed result and outcome</th></tr></thead><tbody>
+<tr><td>AC05</td><td>Inspected the explanatory paragraph rendered above the redemption form in <code>apps/web/src/main.tsx:115</code>; compared it with AC05 in the ticket; rebuilt the web app.</td><td>Pass. Before submission, the screen states that the link expires after seven days, can be used once, anyone who obtains it can claim it, the entered email is not verified, and no email is sent. It also states the member's read-only scope. The independent web production build passes.</td></tr>
+<tr><td>V05 / evidence quality</td><td>Inspected the updated V05 actual-result row and implementation handoff in the T-0025 ticket.</td><td>Pass for the correction. V05 explicitly records the five redemption-screen disclosures, attributes the copy correction to the first review, describes source inspection, and names the live MCP and browser walkthroughs that remain unrun. The implementation-evidence section records the exact web build command and result. The report does not claim unperformed browser or MCP checks.</td></tr>
+<tr><td>AC04 / redemption-flow preservation</td><td>Inspected route parsing, hash clearing, POST handling, and completion/failure callbacks in <code>apps/web/src/main.tsx</code>.</td><td>Pass by source inspection. The app extracts the invitation from the hash, replaces the visible URL with <code>#/redeem</code> before form submission, and sends the secret in the POST JSON body. <code>finally</code> clears the secret after success or failure. Success switches to the invited workspace then replaces the route with <code>#/overview</code>; failure displays a generic unavailable/invalid invitation page without the secret. No URL cleanup or redemption flow code changed in this correction.</td></tr>
+</tbody></table>
+
+<h2>Limits</h2>
+<p>No live browser redemption, browser history/network/referrer capture, or MCP-client attempt was performed in this second review. The first review remains authoritative for broader T-0025 evidence gaps: explicit migration rerun, exact frozen expiry boundary, injected account-creation failure, exhaustive endpoint/guessed-ID coverage, and browser/log inspection. This PASS applies only to the requested AC05 correction and preservation of the inspected flow; the coordinator should not infer that these other gaps have been closed.</p>
+
+<h2>Next action</h2>
+<p>Keep the original FAIL report as historical evidence and link this R2 result beside it. The AC05 correction is suitable to proceed; the coordinator should decide whether the remaining V01/V03/V04/V05 limits need more verification before closing T-0025.</p>
+</main></body></html>

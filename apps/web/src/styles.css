@@ -253,9 +253,10 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .create-panel .link-form{gap:0;padding-top:24px}
 .create-panel .link-form label{font-size:12px;margin-bottom:8px}
 .create-panel .link-form input{height:45px;font-size:13px;margin-bottom:20px}
-.create-panel .slug-input{height:45px;margin-bottom:21px}
-.create-panel .slug-input input{height:100%;min-width:0;margin:0;padding:0 8px;align-self:stretch;line-height:normal}
-.create-panel .slug-prefix,.create-panel .slug-hint{flex:none;align-self:center;white-space:nowrap}
+.create-panel .slug-input{display:grid;grid-template-columns:max-content minmax(0,1fr) max-content;height:45px;margin-bottom:21px;align-items:center}
+.create-panel .slug-prefix{display:block;align-self:center;padding-left:13px;font-size:13px;line-height:1;white-space:nowrap}
+.create-panel .slug-hint{display:grid;place-items:center;align-self:stretch;padding:0 12px 0 8px;line-height:1;white-space:nowrap}
+.create-panel .slug-input input{width:100%;height:100%;min-width:0;margin:0;padding:0 8px;align-self:stretch;line-height:normal}
 .create-panel .primary-button{height:45px;margin-top:4px;font-size:13px}
 .form-footnote{justify-content:flex-start;font-size:11px}
 .link-detail-page>.back-link{margin:0 0 22px}
@@ -310,3 +311,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .utm-preview > span { color: var(--muted, #68737d); font-size: .7rem; font-weight: 700; letter-spacing: .06em; }
 .utm-preview > code { color: var(--ink, #1e2930); font-size: .82rem; line-height: 1.5; }
 @media (max-width: 620px) { .utm-fields { grid-template-columns: 1fr; } }
+
+.workspace-switcher select{max-width:185px;border:1px solid var(--line);border-radius:9px;background:#fff;padding:9px 28px 9px 10px;color:var(--ink);font:600 11px inherit}.readonly-badge{border:1px solid #d8e5d9;border-radius:99px;padding:6px 9px;background:#f2f7f2;color:#42644d;font-size:10px;font-weight:700;white-space:nowrap}.invitations-panel{width:100%;padding:26px}.invitations-panel>p{max-width:680px;color:var(--muted);font-size:13px;line-height:1.6}.invitation-secret{display:grid;gap:10px;padding:15px;margin:18px 0;border:1px solid #c9ddce;border-radius:12px;background:#f5faf6}.invitation-secret strong{font-size:12px;color:#31553d}.invitation-secret code{display:block;overflow-wrap:anywhere;padding:10px;border-radius:8px;background:white;color:#42534a;font-size:11px}.invitation-secret .copy-button{justify-self:start}.invitation-list small{display:block;margin-top:4px}.readonly-workspace .link-actions,.readonly-workspace .rule-actions,.readonly-workspace .rule-form,.readonly-workspace .settings-form,.readonly-workspace .archive-control,.readonly-workspace .duplicate-control{display:none!important}.readonly-workspace .primary-button{display:none}
+@media(max-width:760px){.workspace-switcher select{max-width:145px}.invitations-panel{padding:19px}.topbar-actions{gap:6px}}
+@media(max-width:520px){.workspace-switcher select{max-width:120px;padding:8px 18px 8px 7px;font-size:10px}.readonly-badge{display:none}}

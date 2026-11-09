@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-0025 implementation review R4 | Redirect Hub</title>
+<link rel="stylesheet" href="../assets/site.css">
+<script src="../assets/menu.js" defer></script>
+</head>
+<body><main>
+<h1>T-0025 implementation review R4</h1>
+<p><strong>Verdict:</strong> NEEDS-INFO. <strong>Candidate:</strong> uncommitted working tree on <code>main</code>, baseline <code>8f63bb5a66655154197e570af1a4a3dfe0b26323</code>. Other dirty workstreams prevent an attributable commit. Current code/tests reviewed are unchanged from R3; the ticket summary and handoff were reconciled to match the new V03/V05 evidence.</p>
+<p>This R4 report supersedes the R3 evidence verdict for the current candidate. No candidate code, ticket acceptance/results content, or queue metadata was changed by the reviewer.</p>
+
+<h2>Environment and independent verification</h2>
+<ul>
+<li>Workspace: <code>D:\WorkITAAI\RDH</code>; Node <code>v24.22.1</code>; pnpm <code>11.25.0</code>.</li>
+<li><code>pnpm --filter @redirect-hub/api test</code> — PASS, 12 tests, 12 passed, 0 failed. Independently run by this reviewer with temporary synthetic SQLite fixtures. This includes the rollback, malformed-secret, exact-expiry, migration rerun, and actual MCP child-process tests.</li>
+<li><code>pnpm --filter @redirect-hub/api build</code> — PASS, <code>tsc --noEmit</code>.</li>
+<li><code>pnpm --filter @redirect-hub/web build</code> — PASS, TypeScript project build and Vite production build.</li>
+<li>No use or modification of <code>data/redirect-hub.sqlite</code>.</li>
+</ul>
+
+<h2>Acceptance-check evidence</h2>
+<table><thead><tr><th>ID</th><th>Procedure and evidence</th><th>Observed result and outcome</th></tr></thead><tbody>
+<tr><td>AC01 / V01</td><td>Ran the API suite; inspected <code>apps/api/src/db.ts</code> and the startup-migration fixture in <code>apps/api/tests/workspaces-and-invitations.test.ts</code>.</td><td>Pass for the tested migration. A second Node process reruns startup against the same temporary DB; snapshots of workspaces, memberships, links/slugs, rules, events, and token IDs/associations remain identical. Existing users get distinct workspaces, and the null-owner legacy link remains unassigned. Default, CA-country, mobile-device, and non-matching redirects preserve the expected destination and event behavior.</td></tr>
+<tr><td>AC02</td><td>Ran invitation tests; inspected authentication middleware and invitation routes in <code>apps/api/src/index.ts</code>.</td><td>Pass for covered paths. Owner sessions create/list/revoke; members cannot manage invitations; another user cannot access a guessed workspace; bearer-token auth is rejected for invitation administration. Listing contains no raw secret or secret hash.</td></tr>
+<tr><td>AC03 / V02</td><td>Ran secret lifecycle and exact-expiry tests; inspected secret generation, hash persistence, and expiry predicates.</td><td>Pass. Secret uses 32 random bytes and only SHA-256 is stored. The creation response returns the fragment URL; listings and redemption responses omit secret material. The seven-day interval, revocation, already-expired request, and expiry-equals-now boundary are tested; equality is rejected without consuming the invitation or creating a user.</td></tr>
+<tr><td>AC04 / V03</td><td>Independently ran API tests and inspected redemption parsing/cleanup in <code>apps/web/src/main.tsx</code> and API handling in <code>apps/api/src/index.ts</code>. Also reviewed the developer's detailed Chrome recorder evidence in the ticket.</td><td>Partial; needs information on history and real logs. Source puts the secret in the fragment, replaces the current URL with <code>#/redeem</code> before submission, POSTs the secret in JSON, and clears transient state after the attempt. The synthetic rollback test independently confirms the error response and captured application error text do not contain the secret. The ticket reports a Chrome fake-recorder run at <code>127.0.0.1:5174</code> / API port <code>58050</code>: six requests, secret in one POST body and zero request URLs/Referer headers, with clean visible URLs before submission and after success. This reviewer did not rerun that capture; its temporary artifacts were removed. The browser's back/forward history entries and a real proxy/access-log configuration were not inspected. The ticket correctly marks these limits.</td></tr>
+<tr><td>AC05</td><td>Inspected the redemption screen copy in <code>apps/web/src/main.tsx</code> and the updated V05 record.</td><td>Pass. Before submission the screen states seven-day expiry, single use, bearer-link claim risk, unverified email, and no email delivery. The first-review copy defect remains corrected.</td></tr>
+<tr><td>AC06 / V03</td><td>Independently ran synthetic valid, duplicate-email, malformed/wrong-secret, expired, revoked, consumed, failure-injection, concurrent, and exact-expiry cases; inspected the transaction in <code>apps/api/src/index.ts</code>.</td><td>Pass for tested failure paths. A trigger aborting invited membership insertion returns 500 and rolls back user, personal workspace, membership, session, and invitation consumption. The response and captured application error text omit the secret. Malformed and valid-format wrong secrets return the same generic 400 without consuming a valid invite. Concurrent redemption yields one success. Browser history and external-log limits remain as noted under AC04.</td></tr>
+<tr><td>AC07 / V04</td><td>Ran workspace access tests; inspected <code>GET /api/links/:id</code> at <code>apps/api/src/index.ts:636</code> and other workspace-scoped reads.</td><td>Pass for covered routes. The new detail handler looks up by link ID and verified workspace ID, returning 404 for inaccessible IDs. Tests cover member list/detail/rules/tags/analytics/archive reads, simulator access, and guessed link/rule IDs from another workspace returning 404 without record data. UI labels the read-only workspace and hides mutation controls.</td></tr>
+<tr><td>AC08 / V04</td><td>Ran member mutation denials and database-snapshot assertions; inspected owner guards.</td><td>Pass for covered routes. Member link, tag, rule, archive/unarchive, duplicate, invitation, and token operations are denied. Link/rule/tag/invitation/token state remains unchanged after denied operations. Owner detail/archive/unarchive/invitation/token controls remain available. No account-administration or link-delete endpoint exists in the inspected route set.</td></tr>
+<tr><td>AC09 / V05</td><td>Independently ran the API suite, including the actual MCP stdio child-process test; inspected <code>apps/api/src/mcp.ts</code> and bearer-token workspace resolution.</td><td>Pass for the tested read path. The MCP child initializes, lists tools, reads only an invitee's personal link with its personal read token, and returns an MCP tool error without shared-link data for an invited-workspace slug. A direct API request selecting the shared workspace is 403. This is a synthetic local test, not an external MCP host/account test.</td></tr>
+<tr><td>AC10 / V01</td><td>Ran the synthetic migration and public redirect/event tests.</td><td>Pass for the tested cases. Default, matched country/device, and non-matching routing preserve the same public slug and expected destinations; event associations/counts are unchanged across migration rerun and new redirect events are recorded.</td></tr>
+<tr><td>AC11</td><td>Inspected the invitation user guide, technical guide, README, and indexes.</td><td>Pass by content inspection. The docs cover owner-only manual invitation management, one-time link copying, expiry, signup, unverified email, bearer-link forwarding risk, read-only access, and no email/API/MCP access.</td></tr>
+</tbody></table>
+
+<h2>Review of newly reported browser and MCP evidence</h2>
+<p>The MCP evidence is independently reproduced by the passing 12-test API suite: <code>workspaces-and-invitations.test.ts</code> starts the actual <code>src/mcp.ts</code> process, performs initialization and tool calls, and asserts private-only list/detail results. The Chrome fake-recorder observation is developer-reported and detailed in V03; the recording artifact was deleted, so it is not independently reproducible from this checkout. It does not claim to test the real application/proxy logs or enumerate browser history entries. Source inspection confirms <code>history.replaceState</code> occurs before POST, and the secret is sent only in the request body.</p>
+
+<h2>Remaining limits and owner</h2>
+<p>No concrete code defect was found in the reviewed paths, and all automated test/build commands pass. The ticket remains NEEDS-INFO because AC04/V03 still lacks browser back/forward history enumeration and inspection of a real access/proxy log configuration. The Developer can add a browser-history assertion and exercise a concrete local access logger/proxy setup, or record an evidence-backed boundary if no supported proxy configuration exists. A deployment-specific proxy configuration would need to be supplied by the owner. Keep the ticket open until these requirements are either evidenced or explicitly reshaped by the Product Owner.</p>
+
+<h2>Next action</h2>
+<p>Have the Developer provide the remaining AC04/V03 evidence for browser history and a concrete real access-log configuration. Then request another independent review. This verdict is not approval to close T-0025.</p>
+</main></body></html>

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>T-0003 UTM readiness review | Redirect Hub</title>
+  <link rel="stylesheet" href="../assets/site.css">
+  <script src="../assets/menu.js" defer></script>
+</head>
+<body>
+<main>
+<h1>T-0003 UTM builder readiness review</h1>
+<p><strong>Review date:</strong> 8 November 2026. <strong>Deliverable:</strong> grooming / definition of ready. <strong>Verdict:</strong> PASS for T-0003, with one downstream T-0007 ticket clarification recorded below.</p>
+<p><strong>Exact candidate:</strong> <code>docs/tickets/T-0003-utm-builder/ticket.html</code>, SHA-256 <code>7AC393467E20700919D6740C0079B97E5BB4B8BFB9ED2B15B7211220D61A00E6</code>. <strong>Environment:</strong> Windows PowerShell, checkout <code>D:\WorkITAAI\RDH</code>, branch <code>main</code>. The checkout contained pre-existing modifications to the ticket and queue; they were not changed during this review. Current source was inspected read-only. No application tests were run, as requested for a planning review.</p>
+
+<h2>Review checks</h2>
+<table>
+<thead><tr><th>ID</th><th>Procedure and evidence</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>R01</td><td>Compared the ticket SHA-256 to the assigned value and read T-0003, the T-0003 and T-0007 queue records, and the T-0007 ticket. T-0003 remains a per-link feature with queue dependency T-0002 only. T-0007 depends on T-0003 and T-0005 and is blocked. T-0003 explicitly supplies the persisted fields/composition contract; its delivery does not depend on T-0007. <code>apps/api/src/routing.ts</code> already selects a rule or default destination, so T-0003 can integrate with the current resolver. T-0007’s outcome says composition follows route selection, although its current ACs do not independently assert that integration.</td><td>PASS. Boundary is implementable. Coordinator should ensure T-0007’s eventual implementation verification asserts that the selected rule/default target is composed after route selection.</td></tr>
+<tr><td>R02</td><td>Compared per-link persistence and API ownership requirements to <code>apps/api/src/db.ts</code>, <code>apps/api/src/schemas.ts</code>, and <code>apps/api/src/index.ts</code>. Current links table has no UTM columns; link create/update schemas and serializer do not expose UTM; create, patch, and get are owner-scoped. The ticket requires all five optional fields, round-trip behavior, ownership, migration-compatible behavior for existing unset links, and explicit create/update semantics.</td><td>PASS. Scope and AC01/V01 identify persisted fields, field ownership, update semantics, and cross-owner isolation. Existing records are covered by the requirement that unset fields leave destination URLs unchanged.</td></tr>
+<tr><td>R03</td><td>Checked the composition contract and procedures against <code>apps/api/src/routing.ts</code>, simulation and redirect handlers in <code>apps/api/src/index.ts</code>, and the create/settings flows in <code>apps/web/src/main.tsx</code>. The ticket places composition after route selection and requires preview, simulation, and redirect to agree. It specifies case-insensitive removal of every standard-key occurrence, one canonical configured key, preservation/order of repeated non-UTM pairs, fragment preservation, and exclusion of inbound short-link query parameters. V03–V05 provide collision, route selection, and forged-query fixtures.</td><td>PASS. Query, fragment, duplicate, and visitor-query behavior is explicit and observable. AC04/V04 cover default and selected rule targets; AC05/V05 cover inbound query exclusion.</td></tr>
+<tr><td>R04</td><td>Compared field validation and preview requirements across scope, AC02–AC03, and V02–V03. Requirements define trimming, 200 Unicode code points, non-string and over-limit rejection, clear-on-null/empty/whitespace, omitted PATCH as unchanged, encoding of interior Unicode/spaces, an exact live preview, and no persistence/click side effect from preview.</td><td>PASS. Required boundary cases and expected outcomes are stated. Shared composition is required across preview/simulation/redirect and output equality is checked.</td></tr>
+<tr><td>R05</td><td>Reviewed documentation impact and the acceptance/verification tables for AC01–AC05 and V01–V05. Each AC has a matching procedure, test fixture/actions, and expected outcome. Documentation impact names the API reference, user guide, and routing architecture contract and identifies the relevant contract subjects.</td><td>PASS. Documentation destinations are sufficiently identifiable in the repository; implementation evidence is correctly marked as not run during grooming.</td></tr>
+<tr><td>R06</td><td>Ran scoped whitespace and documentation checks after saving this report: <code>git diff --check -- docs/reviews/2026-11-08-T0003-utm-readiness.html</code>; HTML structure and local-link validation script over this report.</td><td>PASS. No whitespace errors; one main element, shared stylesheet and menu script are present, and all local links resolve.</td></tr>
+</tbody>
+</table>
+
+<h2>Specific downstream note</h2>
+<p>T-0007’s current outcome promises routing followed by UTM composition, but AC01–AC03 and V01–V03 do not verify that promise or parity between the selected target in simulation and live redirect after composition. This does not make T-0003 dependent on T-0007: T-0003 owns and tests the per-link helper and current redirect/simulation integration. Before T-0007 is considered implementation-ready or reviewed, its ticket should add an acceptance and verification check proving that rule/default selection precedes this shared helper and that simulation/live redirect agree. The coordinator owns that ticket edit. This is a downstream follow-up, not an unresolved requirement for T-0003.</p>
+
+<h2>Limits and handoff</h2>
+<p>This is a requirements review of the exact ticket HTML hash above, not an implementation review. No app tests or build were run. The UI currently has create and link-settings forms, while the feature is not implemented. The report’s PASS means the T-0003 scope, outcomes, dependencies, and verification plan are ready for assignment; it does not mean the feature exists or the app is ready to test.</p>
+<p><strong>Changed path:</strong> <code>docs/reviews/2026-11-08-T0003-utm-readiness.html</code>. The ticket and queue were not edited; nothing was staged or committed. <strong>Next action:</strong> coordinator records this review, aligns queue status if appropriate, assigns T-0003 implementation, and retains the T-0007 follow-up for its next grooming/implementation pass.</p>
+</main>
+</body>
+</html>

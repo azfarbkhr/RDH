@@ -47,7 +47,12 @@ test("self-service signup preserves bootstrap adoption and isolates subsequent a
     "the first account adopts legacy null-owner links");
 
   const firstSession = await api("/api/auth/session", {}, firstCookie);
-  assert.deepEqual(await firstSession.json(), { user: firstUser, configured: true });
+  const firstSessionData = await firstSession.json() as { user: typeof firstUser; configured: boolean; workspaces: Array<{ id: string; role: string; isPersonal: number }> };
+  assert.equal(firstSessionData.user.id, firstUser.id);
+  assert.equal(firstSessionData.configured, true);
+  assert.equal(firstSessionData.workspaces.length, 1);
+  assert.equal(firstSessionData.workspaces[0].role, "owner");
+  assert.equal(firstSessionData.workspaces[0].isPersonal, 1);
 
   const firstLinkResponse = await api("/api/links", { method: "POST", body: JSON.stringify({ name: "Owner A link", slug: "owner-a", destinationUrl: "https://example.test/a" }) }, firstCookie);
   assert.equal(firstLinkResponse.status, 201);

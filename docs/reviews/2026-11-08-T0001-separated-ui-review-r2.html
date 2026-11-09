@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>T-0001 separated UI review, round 2 | Redirect Hub</title>
+  <link rel="stylesheet" href="../assets/site.css">
+  <script defer src="../assets/menu.js"></script>
+</head>
+<body>
+  <main>
+    <h1>T-0001 separated UI review, round 2</h1>
+    <p><strong>Verdict: FAIL.</strong> The routing-rule defects from the previous review are corrected, the task-focused page separation remains intact, and the developer's recorded viewport evidence covers the full requested screen/size matrix. AC03 still fails: the Links search input suppresses its keyboard focus outline without a focus style on its wrapper. Secondary-action keyboard coverage and rendered non-text contrast remain open.</p>
+
+    <h2>Candidate reviewed</h2>
+    <ul>
+      <li><strong>Candidate commit:</strong> None; app sources are uncommitted in the shared checkout.</li>
+      <li><strong>Workspace / branch:</strong> <code>D:\WorkITAAI\RDH</code> / <code>main</code>.</li>
+      <li><strong>Reviewer:</strong> Independent Reviewer; Windows PowerShell for build/Git checks; source review and WCAG contrast arithmetic performed for this review.</li>
+      <li><strong>SHA-256:</strong> <code>apps/web/src/main.tsx</code> — <code>42B10560BD7FCE9E7C2912A86E107AD86505EC194D7E3EA45643ECE986D2C29E</code>; <code>apps/web/src/styles.css</code> — <code>0185C0348FD22DBB4B95C2E1E2B775AAD56163C1D9D83CF317E48480686FAB9C</code>; <a href="../tickets/T-0001-app-ui-redesign/ticket.html">T-0001 ticket</a> — <code>42F9EDB4A4638D021A73F48B7DCC39B76F39F88BAE404EBD80A81EAEA9AFA8B3</code>. All matched dispatch before inspection.</li>
+    </ul>
+
+    <h2>Acceptance review</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Procedure, evidence, and observed result</th><th>Outcome</th></tr></thead>
+      <tbody>
+        <tr><td>AC01 / V01</td><td><strong>Reviewer procedure:</strong> Read the exact React route/render conditions, <code>RoutingEditor</code> load and mutation paths, styles, prior review findings, and T-0001's V01 record. <strong>Evidence:</strong> <code>apps/web/src/main.tsx:20-26, 52-134, 338-428</code>; <code>docs/tickets/T-0001-app-ui-redesign/ticket.html</code>. <strong>Verified in code:</strong> Overview, Links, Create, Analytics, Developer/API, and per-link areas remain separate. The Links page does not include the full Create form or Analytics dashboard. Routing and simulator remain under the link's Routing tab. On first mount the editor calls <code>loadRules()</code>; it displays a loading status, validates the returned rules array, displays a load error with Retry, and only displays the empty state after successful loading (<code>main.tsx:53-81, 128-133</code>). Add and reorder/delete now catch both non-OK response and rejected fetch/JSON paths and report accessible status/alert feedback (<code>main.tsx:88-116, 130</code>). The previously failing text colors are absent; updated muted text includes <code>#59685e</code>. Reviewer spot-check arithmetic: <code>#59685e</code> on white = 5.89:1 and on <code>#f4f7f3</code> = 5.45:1; <code>#66736a</code> on <code>#edf6ef</code> = 4.50:1. <strong>Developer-reported, not reviewer-observed:</strong> isolated Chrome review on synthetic data inspected empty/populated pages and verified rule load error/Retry and Delete failure with API interruption; no screenshots were persisted.</td><td><strong>PASS.</strong> The earlier false empty state and mutation error gaps are corrected in source; page separation remains intact. Browser observations are attributed to the UI Developer.</td></tr>
+        <tr><td>AC02 / V02</td><td><strong>Procedure/evidence source:</strong> Compared the documented V02 matrix in the ticket to AC02's required surfaces and widths; reviewed the new responsive CSS at <code>styles.css:187-189, 268-269</code>. <strong>Developer-reported, not reviewer-observed:</strong> Chrome visual review covered setup/sign-in, Overview, Links, Create, link detail Overview/Routing/Analytics/Settings, rule editor/simulator, workspace Analytics, and Developer/API at both 390×844 and 1440×900. The report says no visible clipping or obscured controls across that matrix. This covers every AC02 screen at each requested width. The implementation report explicitly says this was visual edge/control inspection rather than a DOM <code>scrollWidth</code> assertion; screenshots were inspected in-session but not saved. This reviewer did not operate Chrome or independently inspect the rendered candidate.</td><td><strong>PASS, based on the recorded developer procedure.</strong> Evidence covers the full matrix and expected visual checks; no independent viewport reproduction or persisted screenshot is available.</td></tr>
+        <tr><td>AC03 / V03</td><td><strong>Reviewer procedure:</strong> Inspected keyboard focus selectors and the Links search control; checked updated source color declarations against the prior failures. <strong>Evidence:</strong> <code>apps/web/src/styles.css:24, 218-220</code>; <code>apps/web/src/main.tsx:382-385</code>; ticket V03. The global rule gives inputs a dark-green focus outline, but the later <code>.search-field input:focus-visible { outline: none }</code> removes it. The search wrapper has no <code>:focus-within</code> border/outline rule, so keyboard focus on the search input has no visible indication. The developer's keyboard walkthrough covered setup/sign-in, skip link/navigation, create, per-link navigation, Routing rule entry, and simulator, but not every secondary action or token workflow; V03 explicitly remains partial. The developer-reported contrast audit covered 66 direct text/token colors across six surfaces, with no pair below 4.5:1 and minimum 4.50:1; this reviewer spot-checked the corrected text colors but did not rerun that script. Rendered non-text/control-boundary contrast was not measured.</td><td><strong>FAIL.</strong> The Links search input has a concrete missing visible-focus state. Complete the remaining keyboard and rendered non-text contrast checks after correction.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Verification and limits</h2>
+    <ul>
+      <li><strong>Reviewer, Windows PowerShell:</strong> <code>pnpm build</code> — passed, exit code 0. API TypeScript check and web TypeScript/Vite production build completed.</li>
+      <li><strong>Reviewer, Windows PowerShell:</strong> <code>git diff --check -- apps/web/src/main.tsx apps/web/src/styles.css</code> — passed, exit code 0.</li>
+      <li><strong>Reviewer:</strong> Confirmed the three dispatched candidate hashes before inspection. Reviewed source code and ticket/report evidence only; did not operate Chrome, the isolated review database, or the demo runtime.</li>
+      <li>Developer's browser, screenshot, interaction, and 66-color contrast results are explicitly attributed to the UI Developer and were not repeated by this reviewer. No automated tests were added or run.</li>
+    </ul>
+
+    <h2>Handoff</h2>
+    <p><strong>UI Developer:</strong> remove the search input's outline suppression or add an equally visible <code>:focus-visible</code>/<code>:focus-within</code> treatment to the search control; rerun the complete keyboard path including search and every secondary/API-token action, then measure rendered non-text/control-boundary contrast. <strong>Coordinator:</strong> keep T-0001 in progress. Once the focus defect is fixed and remaining AC03 evidence is recorded in V03, route that exact candidate for another independent review. This review modified only this new review artifact; no source, ticket, or queue metadata was changed.</p>
+  </main>
+</body>
+</html>

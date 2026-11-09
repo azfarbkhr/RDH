@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>T-0013 Definition-of-Ready Review | Redirect Hub</title>
+  <link rel="stylesheet" href="../assets/site.css">
+  <script src="../assets/menu.js" defer></script>
+</head>
+<body><main>
+<h1>T-0013 Definition-of-Ready Review</h1>
+<p><strong>Verdict: FAIL — bounded requirements correction required.</strong> This review covers readiness of the self-hosting requirements candidate only. It does not approve backlog priority or certify the implementation.</p>
+<p><strong>Candidate:</strong> <a href="../tickets/T-0013-reproducible-self-hosting/ticket.html">T-0013 ticket</a>, SHA-256 <code>59BAC051A8A77523D2BBC1F811568EAC176C2ADFD10F78E72CB379962EFE34FD</code>. No Git commit exists; the review applies to this exact working-tree file. <strong>Environment:</strong> <code>D:\WorkITAAI\RDH</code>, branch <code>main</code>, Windows PowerShell, 9 November 2026.</p>
+
+<h2>Review finding</h2>
+<ol>
+<li><strong>AC05 does not define the full preservation boundary it promises.</strong> The outcome and scope promise preservation of existing Redirect Hub SQLite records and associated data. The ticket's own current-evidence section identifies transactional workspace-membership backfill, but AC05 checks identifiers only for users, links, rules, click events, and API tokens. The current schema also contains workspaces, workspace memberships, invitations, tags, link-tag relationships, and sessions. It is unclear which of these must survive schema upgrades and which (especially active sessions and bearer invitations) should be invalidated. “A previously supported schema” also does not identify the historical schema fixture(s) to test. This leaves the highest-risk data-preservation requirement open to inconsistent implementation and review.</li>
+</ol>
+<p><strong>Bounded correction:</strong> In AC05, enumerate the supported database fixture baseline(s) and the durable entities/relationships whose IDs, ownership, slugs, and redirect behavior must be preserved. State explicitly whether sessions and outstanding invitations are preserved or invalidated on upgrade. Include workspace membership, tags, and link-tag associations where they exist. Keep synthetic temporary database verification and the prohibition on accessing the normal database path.</p>
+
+<h2>Readiness checklist</h2>
+<table><thead><tr><th>ID</th><th>Checklist and evidence</th><th>Result</th></tr></thead><tbody>
+<tr><td>R1</td><td>Outcome, role, and scope: the ticket identifies the selected Node/Hono/React application, a Developer delivery, local and Compose self-hosting, persistent SQLite, documentation, and exclusions. I checked the T-0013 queue row; it is in progress with no dependencies. The explicitly bounded choices are reasonable implementation decisions. Backlog ranking is separate.</td><td>Pass</td></tr>
+<tr><td>R2</td><td>Current-code evidence: independently inspected <code>package.json</code>, <code>apps/api/package.json</code>, <code>apps/web/package.json</code>, <code>apps/api/src/db.ts</code>, <code>apps/api/src/index.ts</code>, and <code>apps/web/vite.config.ts</code>. Confirmed pnpm workspace scripts and lockfile; the current Node engine is <code>&gt;=22</code> and no root <code>packageManager</code> pin exists. Confirmed SQLite <code>DatabaseSync</code>, <code>DATABASE_PATH</code> default/override, the API environment reads, idempotent table creation/conditional alters, transactional workspace backfill, <code>GET /api/health</code> returning <code>{"status":"ok"}</code>, and Vite proxies for <code>/api</code> and <code>/l</code>. These support the ticket's rationale and proposed work.</td><td>Pass</td></tr>
+<tr><td>R3</td><td>Primary runtime evidence: independently checked the official <a href="https://nodejs.org/download/release/latest-krypton/docs/api/sqlite.html">Node v24.22.2 SQLite docs</a>, <a href="https://nodejs.org/download/release/latest-jod/docs/api/sqlite.html">Node v22.23.4 SQLite docs</a>, <a href="https://nodejs.org/en/about/previous-releases">Node release page</a>, and its <a href="https://raw.githubusercontent.com/nodejs/Release/main/schedule.json">release schedule JSON</a>. The ticket correctly distinguishes Node 24 SQLite Stability 1.2 release-candidate status from Node 22 Stability 1.1 active development; Node 22 maintenance began 2025-10-21 and ends 2027-04-30; Node 24 maintenance began 2026-10-20 and ends 2028-04-30; Node 26 LTS began 2026-10-28. The requirement to select and exercise a supported runtime remains an implementation check, not a verified compatibility claim.</td><td>Pass</td></tr>
+<tr><td>R4</td><td>AC01–AC04 and AC06 each have a corresponding V01–V04/V06 procedure with commands or observable setup/use outcomes. Their acceptance conditions align with the described local development and planned Compose topology. V04's configuration scope is appropriately bounded to application/API/MCP variables. AC03's “exposes only the intended entry service” should be made concrete in implementation documentation (which service publishes a host port and which paths proxy inward), but the ticket also requires that routing topology to be selected and exercised; this is not an independent readiness blocker.</td><td>Pass</td></tr>
+<tr><td>R5</td><td>AC05/V05: the synthetic temporary database and repeat-startup procedure is feasible and appropriately excludes the normal database path. However, the preservation set and the historical schema fixture baseline are under-specified as described in the finding above. The criteria do not yet make the intended preservation guarantee objectively reviewable across the current data model.</td><td>Fail</td></tr>
+<tr><td>R6</td><td>Documentation impact, open decisions, and safety boundaries: the ticket calls for README, environment example, operations guide, and technical note; requires placeholder-only secrets and synthetic data; excludes Django import and public release; and identifies the schema/runtime/topology decisions. The README and cited source files support those boundaries. The current runtime support floor and pnpm version are intentionally not claimed as settled.</td><td>Pass</td></tr>
+<tr><td>R7</td><td>Independent artifact hygiene check: on this checkout I resolved all local <code>href</code>/<code>src</code> references from the ticket; 7 local references, 0 broken. <code>git diff --check -- docs/tickets/T-0013-reproducible-self-hosting/ticket.html</code> exited 0; Git printed only the working-copy LF-to-CRLF notice. Candidate SHA-256 matched the assigned hash.</td><td>Pass</td></tr>
+</tbody></table>
+
+<h2>Acceptance and verification procedure assessment</h2>
+<table><thead><tr><th>ID</th><th>Assessment</th><th>Result</th></tr></thead><tbody>
+<tr><td>AC01 / V01</td><td>Feasible. Requires declared/pinned runtime inputs before execution, clean frozen install, build, dev startup, HTTP health result, and UI reachability. Grooming has not run it, as expected.</td><td>Pass</td></tr>
+<tr><td>AC02 / V02</td><td>Feasible and safely specifies a fresh temporary database, synthetic account/link, restart, and redirect persistence.</td><td>Pass</td></tr>
+<tr><td>AC03 / V03</td><td>Feasible once the Compose topology exists; covers routes, health, volume persistence, restart, and backup/restore. Clarify the host-published entry service when implementing.</td><td>Pass</td></tr>
+<tr><td>AC04 / V04</td><td>Feasible and cross-checkable against current process environment reads; requires an example with no real secrets and explicit proxy trust behavior.</td><td>Pass</td></tr>
+<tr><td>AC05 / V05</td><td>The procedure is feasible but expected preservation entities and fixture baselines are incomplete; see the finding.</td><td>Fail</td></tr>
+<tr><td>AC06 / V06</td><td>Feasible; requests actionable setup/operations documentation and makes the prototype/public-exposure limit explicit.</td><td>Pass</td></tr>
+</tbody></table>
+
+<h2>Review limits</h2>
+<ul>
+<li>This was a requirements/readiness review, not an implementation review. I did not install dependencies, build the app, start services, run application tests or Compose, or open any SQLite database.</li>
+<li>Node docs and release schedule pages are mutable official sources; findings above are as observed on 9 November 2026.</li>
+<li>No candidate commit exists. A later content change requires a review of the new exact candidate hash.</li>
+</ul>
+
+<h2>Handoff</h2>
+<p><strong>Changed path:</strong> <code>docs/reviews/2026-11-09-T0013-readiness.html</code> only. <strong>Next owner/action:</strong> Requirements Analyst makes the bounded AC05 correction, then return the updated ticket to an independent reviewer for a new exact-candidate readiness review. Keep T-0013 in progress until that review passes; this verdict does not change queue metadata or make a Product Owner ranking decision.</p>
+</main></body>
+</html>
